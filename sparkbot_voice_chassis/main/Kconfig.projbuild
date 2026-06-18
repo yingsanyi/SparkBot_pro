@@ -1,0 +1,59 @@
+menu "SparkBot Voice Chassis"
+
+    config SPARKBOT_VOICE_CHASSIS_MOVE_MS
+        int "Forward/backward movement pulse in ms"
+        default 550
+        range 100 5000
+
+    config SPARKBOT_VOICE_CHASSIS_TURN_MS
+        int "Left/right turn pulse in ms"
+        default 650
+        range 100 5000
+
+    config SPARKBOT_VOICE_CHASSIS_MIC_GAIN
+        int "Microphone input gain"
+        default 35
+        range 0 45
+
+    config SPARKBOT_VOICE_CHASSIS_WAKE_MODE_90
+        bool "Use factory-demo wake mode 90"
+        default y
+
+    config SPARKBOT_VOICE_CHASSIS_WAKE_PROMPT_ENABLE
+        bool "Play wake prompt tone"
+        default n
+
+    config SPARKBOT_VOICE_CHASSIS_LCD_ENABLE
+        bool "Enable LCD status UI"
+        default y
+
+    config SPARKBOT_VOICE_CHASSIS_WAKE_PROMPT_DELAY_MS
+        int "Wake prompt delay before listening"
+        default 120
+        range 0 500
+
+    config SPARKBOT_VOICE_CHASSIS_COMMAND_WAIT_MS
+        int "Wake-to-command speech wait in ms"
+        default 8000
+        range 1000 20000
+
+    config SPARKBOT_VOICE_CHASSIS_COMMAND_TIMEOUT_MS
+        int "Multinet command recognition timeout in ms"
+        default 5760
+        range 1000 20000
+
+    config SPARKBOT_VOICE_CHASSIS_COMMAND_SETTLE_MS
+        int "Quiet gap before accepting a command in ms"
+        default 400
+        range 0 2000
+
+    config SPARKBOT_VOICE_CHASSIS_COMMAND_VAD_GATE
+        bool "Wait for VAD speech before feeding MultiNet"
+        default n
+
+    config SPARKBOT_VOICE_CHASSIS_MN_THRESHOLD_PERCENT
+        int "Multinet command threshold percent, 0 uses model default"
+        default 0
+        range 0 99
+
+endmenu

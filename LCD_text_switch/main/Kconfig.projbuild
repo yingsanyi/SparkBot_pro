@@ -1,0 +1,10 @@
+menu "LCD Text Switch Configuration"
+
+    config LCD_TEXT_SWITCH_PERIOD_MS
+        int "LCD text switch period in ms"
+        range 100 3600000
+        default 1000
+        help
+            Delay between the HelloWorld and Chinese text screens.
+
+endmenu

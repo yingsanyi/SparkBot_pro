@@ -1,0 +1,31 @@
+menu "LCD Color Speech Configuration"
+
+    config LCD_COLOR_SPEECH_HOLD_MS
+        int "Color hold time in ms"
+        range 500 3600000
+        default 2500
+        help
+            Delay after each color name is displayed and spoken.
+
+    config LCD_COLOR_SPEECH_VOLUME
+        int "Speaker volume"
+        range 0 100
+        default 75
+        help
+            Output volume passed to esp_codec_dev_set_out_vol().
+
+    config SPARKBOT_AUDIO_I2C_NUM
+        int "Audio I2C port"
+        range 0 1
+        default 0
+        help
+            I2C controller used to configure the ES8311 codec.
+
+    config SPARKBOT_AUDIO_I2S_NUM
+        int "Audio I2S port"
+        range 0 1
+        default 0
+        help
+            I2S controller used to send PCM samples to the ES8311 codec.
+
+endmenu

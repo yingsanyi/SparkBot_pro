@@ -1,0 +1,25 @@
+menu "Baidu services"
+
+    config BAIDU_ERNIEBOT_ACCESS_TOKEN
+        string "ERNIE Bot access token"
+        default ""
+        help
+            Access token used by the Baidu ERNIE Bot chat endpoint.
+            Keep this empty in source control and configure it locally.
+
+    config BAIDU_VOICE_ACCESS_TOKEN
+        string "Voice service access token"
+        default ""
+        help
+            Access token used by Baidu speech-to-text and text-to-speech endpoints.
+            Keep this empty in source control and configure it locally.
+
+    config BAIDU_ASR_CUID
+        string "Speech-to-text CUID"
+        default "esp_sparkbot"
+
+    config BAIDU_TTS_CUID
+        string "Text-to-speech CUID"
+        default "esp_sparkbot"
+
+endmenu

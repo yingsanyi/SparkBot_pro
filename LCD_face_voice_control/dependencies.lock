@@ -1,0 +1,17 @@
+dependencies:
+  espressif/esp-dsp:
+    dependencies: []
+    source:
+      path: E:\practiceWeek\codes\SparkBot_pro\tank\sparkbot_motion_control\managed_components\espressif__esp-dsp
+      type: local
+    version: 1.8.2
+  idf:
+    source:
+      type: idf
+    version: 5.5.4
+direct_dependencies:
+- espressif/esp-dsp
+- idf
+manifest_hash: 8fbbecae51c4d071274f5bed2aa19e3163ceff8ee24a865f394b18818f2ccb94
+target: esp32s3
+version: 2.0.0

@@ -1,0 +1,38 @@
+menu "LCD Color Audio Configuration"
+
+    config LCD_AUDIO_MODE_HOLD_MS
+        int "Mode hold time in ms"
+        range 500 3600000
+        default 2500
+        help
+            How long each LCD color and speaker tone mode stays active.
+
+    config LCD_AUDIO_TONE_MS
+        int "Tone duration in ms"
+        range 100 5000
+        default 700
+        help
+            Duration of each speaker tone.
+
+    config LCD_AUDIO_VOLUME
+        int "Speaker volume"
+        range 0 100
+        default 70
+        help
+            Output volume passed to esp_codec_dev_set_out_vol().
+
+    config SPARKBOT_AUDIO_I2C_NUM
+        int "Audio I2C port"
+        range 0 1
+        default 0
+        help
+            I2C controller used to configure the ES8311 codec.
+
+    config SPARKBOT_AUDIO_I2S_NUM
+        int "Audio I2S port"
+        range 0 1
+        default 0
+        help
+            I2S controller used to send PCM samples to the ES8311 codec.
+
+endmenu

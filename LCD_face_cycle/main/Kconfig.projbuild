@@ -1,0 +1,10 @@
+menu "LCD Face Cycle Configuration"
+
+    config LCD_FACE_CYCLE_PERIOD_MS
+        int "Expression switch period in ms"
+        default 1500
+        range 200 3600000
+        help
+            Delay between two full-screen face scenes.
+
+endmenu

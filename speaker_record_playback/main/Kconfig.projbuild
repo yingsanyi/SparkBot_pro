@@ -1,0 +1,38 @@
+menu "Speaker Record Playback Configuration"
+
+    config RECORD_PLAYBACK_VOLUME
+        int "Speaker volume"
+        range 0 100
+        default 80
+        help
+            Output volume used for prompts and recorded audio playback.
+
+    config RECORD_PLAYBACK_SECONDS
+        int "Recording duration in seconds"
+        range 1 15
+        default 5
+        help
+            Fixed duration for recording human voice.
+
+    config RECORD_PLAYBACK_MIC_GAIN_DB
+        int "Microphone gain in dB"
+        range 0 45
+        default 35
+        help
+            Input gain passed to esp_codec_dev_set_in_gain().
+
+    config SPARKBOT_AUDIO_I2C_NUM
+        int "Audio I2C port"
+        range 0 1
+        default 0
+        help
+            I2C controller used to configure the ES8311 codec.
+
+    config SPARKBOT_AUDIO_I2S_NUM
+        int "Audio I2S port"
+        range 0 1
+        default 0
+        help
+            I2S controller used by ES8311 playback and recording.
+
+endmenu

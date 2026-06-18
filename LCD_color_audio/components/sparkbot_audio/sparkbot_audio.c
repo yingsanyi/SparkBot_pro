@@ -1,0 +1,131 @@
+#include <stdbool.h>
+
+#include "driver/i2c.h"
+#include "driver/i2s_std.h"
+#include "esp_check.h"
+#include "esp_codec_dev_defaults.h"
+#include "esp_log.h"
+#include "sparkbot_audio.h"
+
+static const char *TAG = "sparkbot_audio";
+
+#define SPARKBOT_I2S_GPIO_CFG       \
+    {                               \
+        .mclk = SPARKBOT_I2S_MCLK,  \
+        .bclk = SPARKBOT_I2S_SCLK,  \
+        .ws = SPARKBOT_I2S_LRCK,    \
+        .dout = SPARKBOT_I2S_DOUT,  \
+        .din = SPARKBOT_I2S_DSIN,   \
+        .invert_flags = {           \
+            .mclk_inv = false,      \
+            .bclk_inv = false,      \
+            .ws_inv = false,        \
+        },                          \
+    }
+
+#define SPARKBOT_I2S_STD_MONO_CFG(sample_rate)                                                       \
+    {                                                                                                 \
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sample_rate),                                           \
+        .slot_cfg = I2S_STD_PHILIP_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO), \
+        .gpio_cfg = SPARKBOT_I2S_GPIO_CFG,                                                            \
+    }
+
+static const audio_codec_data_if_t *s_i2s_data_if = NULL;
+static i2s_chan_handle_t s_i2s_tx_chan = NULL;
+static bool s_i2c_initialized = false;
+
+static esp_err_t sparkbot_audio_i2c_init(void)
+{
+    if (s_i2c_initialized) {
+        return ESP_OK;
+    }
+
+    const i2c_config_t i2c_config = {
+        .mode = I2C_MODE_MASTER,
+        .sda_io_num = SPARKBOT_I2C_SDA,
+        .sda_pullup_en = GPIO_PULLUP_ENABLE,
+        .scl_io_num = SPARKBOT_I2C_SCL,
+        .scl_pullup_en = GPIO_PULLUP_ENABLE,
+        .master.clk_speed = 400000,
+    };
+
+    ESP_RETURN_ON_ERROR(i2c_param_config(SPARKBOT_I2C_NUM, &i2c_config), TAG, "I2C parameter config failed");
+    ESP_RETURN_ON_ERROR(i2c_driver_install(SPARKBOT_I2C_NUM, i2c_config.mode, 0, 0, 0), TAG, "I2C driver install failed");
+
+    s_i2c_initialized = true;
+    return ESP_OK;
+}
+
+esp_err_t sparkbot_audio_init(const i2s_std_config_t *i2s_config)
+{
+    if (s_i2s_tx_chan) {
+        return ESP_OK;
+    }
+
+    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(CONFIG_SPARKBOT_AUDIO_I2S_NUM, I2S_ROLE_MASTER);
+    chan_cfg.auto_clear = true;
+    ESP_RETURN_ON_ERROR(i2s_new_channel(&chan_cfg, &s_i2s_tx_chan, NULL), TAG, "create I2S TX channel failed");
+
+    const i2s_std_config_t default_i2s_cfg = SPARKBOT_I2S_STD_MONO_CFG(16000);
+    const i2s_std_config_t *active_i2s_cfg = i2s_config ? i2s_config : &default_i2s_cfg;
+
+    ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(s_i2s_tx_chan, active_i2s_cfg), TAG, "init I2S std mode failed");
+    ESP_RETURN_ON_ERROR(i2s_channel_enable(s_i2s_tx_chan), TAG, "enable I2S TX channel failed");
+
+    audio_codec_i2s_cfg_t i2s_cfg = {
+        .port = CONFIG_SPARKBOT_AUDIO_I2S_NUM,
+        .tx_handle = s_i2s_tx_chan,
+        .rx_handle = NULL,
+    };
+    s_i2s_data_if = audio_codec_new_i2s_data(&i2s_cfg);
+    ESP_RETURN_ON_FALSE(s_i2s_data_if, ESP_ERR_NO_MEM, TAG, "create codec I2S data interface failed");
+
+    return ESP_OK;
+}
+
+esp_codec_dev_handle_t sparkbot_audio_codec_speaker_init(void)
+{
+    ESP_ERROR_CHECK(sparkbot_audio_i2c_init());
+    ESP_ERROR_CHECK(sparkbot_audio_init(NULL));
+
+    const audio_codec_gpio_if_t *gpio_if = audio_codec_new_gpio();
+    ESP_ERROR_CHECK(gpio_if ? ESP_OK : ESP_ERR_NO_MEM);
+
+    audio_codec_i2c_cfg_t i2c_cfg = {
+        .port = SPARKBOT_I2C_NUM,
+        .addr = ES8311_CODEC_DEFAULT_ADDR,
+    };
+    const audio_codec_ctrl_if_t *i2c_ctrl_if = audio_codec_new_i2c_ctrl(&i2c_cfg);
+    ESP_ERROR_CHECK(i2c_ctrl_if ? ESP_OK : ESP_ERR_NO_MEM);
+
+    const esp_codec_dev_hw_gain_t gain = {
+        .pa_voltage = 5.0,
+        .codec_dac_voltage = 3.3,
+    };
+
+    es8311_codec_cfg_t es8311_cfg = {
+        .ctrl_if = i2c_ctrl_if,
+        .gpio_if = gpio_if,
+        .codec_mode = ESP_CODEC_DEV_TYPE_OUT,
+        .pa_pin = SPARKBOT_POWER_AMP_IO,
+        .pa_reverted = false,
+        .master_mode = false,
+        .use_mclk = true,
+        .digital_mic = false,
+        .invert_mclk = false,
+        .invert_sclk = false,
+        .hw_gain = gain,
+    };
+    const audio_codec_if_t *es8311_dev = es8311_codec_new(&es8311_cfg);
+    ESP_ERROR_CHECK(es8311_dev ? ESP_OK : ESP_ERR_NO_MEM);
+
+    esp_codec_dev_cfg_t codec_dev_cfg = {
+        .dev_type = ESP_CODEC_DEV_TYPE_OUT,
+        .codec_if = es8311_dev,
+        .data_if = s_i2s_data_if,
+    };
+
+    esp_codec_dev_handle_t codec = esp_codec_dev_new(&codec_dev_cfg);
+    ESP_ERROR_CHECK(codec ? ESP_OK : ESP_ERR_NO_MEM);
+    return codec;
+}

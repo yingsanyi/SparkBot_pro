@@ -1,0 +1,19 @@
+menu "LCD Color Frequency Configuration"
+
+    config LCD_COLOR_HOLD_MS
+        int "Color hold time in ms"
+        range 500 3600000
+        default 4000
+        help
+            How long each color and backlight frequency mode stays active.
+
+    config LCD_MIN_HALF_PERIOD_MS
+        int "Minimum backlight half-period in ms"
+        range 10 1000
+        default 40
+        help
+            Lower limit for the software generated backlight toggle half-period.
+            This protects the task from trying to blink faster than the GPIO
+            loop should run.
+
+endmenu

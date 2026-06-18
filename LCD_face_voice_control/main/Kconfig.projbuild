@@ -1,0 +1,22 @@
+menu "LCD Face Voice Control"
+
+    config LCD_FACE_VOICE_MIC_GAIN
+        int "Microphone input gain"
+        default 30
+        range 0 45
+
+    config LCD_FACE_VOICE_WAKE_MODE_90
+        bool "Use factory-demo wake mode 90"
+        default y
+
+    config LCD_FACE_VOICE_COMMAND_TIMEOUT_MS
+        int "Multinet command recognition timeout in ms"
+        default 5760
+        range 1000 20000
+
+    config LCD_FACE_VOICE_MN_THRESHOLD_PERCENT
+        int "Multinet command threshold percent, 0 uses model default"
+        default 0
+        range 0 99
+
+endmenu

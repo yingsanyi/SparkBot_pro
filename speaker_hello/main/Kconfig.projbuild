@@ -1,0 +1,31 @@
+menu "Speaker Hello Configuration"
+
+    config SPEAKER_HELLO_VOLUME
+        int "Speaker volume"
+        range 0 100
+        default 75
+        help
+            Output volume passed to esp_codec_dev_set_out_vol().
+
+    config SPEAKER_HELLO_REPEAT_DELAY_MS
+        int "Repeat delay in ms"
+        range 0 3600000
+        default 3000
+        help
+            Delay before replaying the embedded "ni hao" WAV. Set to 0 to play once.
+
+    config SPARKBOT_AUDIO_I2C_NUM
+        int "Audio I2C port"
+        range 0 1
+        default 0
+        help
+            I2C controller used to configure the ES8311 codec.
+
+    config SPARKBOT_AUDIO_I2S_NUM
+        int "Audio I2S port"
+        range 0 1
+        default 0
+        help
+            I2S controller used to send PCM samples to the ES8311 codec.
+
+endmenu

@@ -1,0 +1,10 @@
+menu "LCD Blink Configuration"
+
+    config LCD_BLINK_PERIOD_MS
+        int "LCD color blink period in ms"
+        range 10 3600000
+        default 1000
+        help
+            Delay between full-screen LCD color changes.
+
+endmenu

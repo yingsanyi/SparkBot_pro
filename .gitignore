@@ -1,0 +1,28 @@
+# ESP-IDF build outputs
+**/build/
+**/managed_components/
+**/sdkconfig.old
+
+# IDE and editor state
+.vscode/
+**/.vscode/
+.idea/
+*.code-workspace
+
+# Python and tooling caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+Thumbs.db
+desktop.ini
+
+# Environment files
+.env
+.env.*

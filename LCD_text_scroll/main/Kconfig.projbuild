@@ -1,0 +1,17 @@
+menu "LCD Text Scroll Configuration"
+
+    config LCD_TEXT_SCROLL_FRAME_MS
+        int "LCD text scroll frame interval in ms"
+        range 10 1000
+        default 40
+        help
+            Delay between marquee animation frames.
+
+    config LCD_TEXT_SCROLL_PIXELS_PER_FRAME
+        int "LCD text scroll pixels per frame"
+        range 1 16
+        default 2
+        help
+            Horizontal movement distance for each marquee frame.
+
+endmenu
