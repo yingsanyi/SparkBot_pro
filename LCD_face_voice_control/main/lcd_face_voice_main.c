@@ -143,6 +143,12 @@ static void show_face_entry(const face_entry_t *entry)
     lcd_face_ui_show_scene(entry->scene, entry->line1, entry->line2);
 }
 
+static void show_initial_waiting_scene(void)
+{
+    s_face_index = 0;
+    lcd_face_ui_show_scene(LCD_FACE_SCENE_IDLE, "HI LEXIN", "WAITING");
+}
+
 static void handle_voice_command(int command_id)
 {
     if (command_id < 0 || command_id >= CMD_COUNT) {
@@ -312,9 +318,7 @@ static void audio_detect_task(void *arg)
             };
             xQueueSend(s_sr_event_queue, &event, 0);
             s_multinet->clean(s_multinet_data);
-            s_afe->enable_wakenet(afe_data);
-            detect_flag = false;
-            s_command_listening = false;
+            ESP_LOGI(TAG, "Command handled; continue listening for another command");
             continue;
         }
 
@@ -346,7 +350,7 @@ static void sr_event_handler_task(void *arg)
             ESP_LOGI(TAG, "Back to wake-word mode");
             lcd_face_ui_show_scene(LCD_FACE_SCENE_SLEEPY, "TIMEOUT", "HI LEXIN");
             vTaskDelay(pdMS_TO_TICKS(800));
-            lcd_face_ui_show_scene(LCD_FACE_SCENE_IDLE, "HI LEXIN", "WAITING");
+            show_initial_waiting_scene();
             s_command_listening = false;
             continue;
         }
@@ -459,7 +463,7 @@ void app_main(void)
     ESP_ERROR_CHECK(lcd_face_ui_init());
     lcd_face_ui_show_scene(LCD_FACE_SCENE_BOOT, "BOOT", "SR INIT");
     ESP_ERROR_CHECK(app_sr_start());
-    lcd_face_ui_show_scene(LCD_FACE_SCENE_IDLE, "HI LEXIN", "WAITING");
+    show_initial_waiting_scene();
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
