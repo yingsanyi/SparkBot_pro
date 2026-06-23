@@ -1,0 +1,8 @@
+menu "LCD Face Touch Control"
+
+    config LCD_FACE_TOUCH_LONGPRESS_MS
+        int "Touch long-press threshold in ms"
+        default 2000
+        range 500 10000
+
+endmenu
