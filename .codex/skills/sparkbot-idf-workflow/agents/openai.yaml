@@ -1,0 +1,4 @@
+interface:
+  display_name: "SparkBot ESP-IDF Workflow"
+  short_description: "Use the known local ESP-IDF build setup"
+  default_prompt: "Use $sparkbot-idf-workflow to build or modify a SparkBot ESP-IDF project with the known local toolchain."

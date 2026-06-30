@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SparkBot WiFi Config</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fa;
+      --surface: #ffffff;
+      --line: #d7dde5;
+      --text: #1d2733;
+      --muted: #667587;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --warn: #b45309;
+      --bad: #b42318;
+      --ok: #15803d;
+      --chip: #edf2f7;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(960px, calc(100% - 24px));
+      margin: 0 auto;
+      padding: 20px 0 28px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 760;
+      letter-spacing: 0;
+    }
+
+    .status-pill {
+      min-width: 122px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 16px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 112px 1fr;
+      gap: 8px 10px;
+      font-size: 14px;
+    }
+
+    .kv span:nth-child(odd) {
+      color: var(--muted);
+    }
+
+    .setup-guide {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .guide-step {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .guide-label {
+      color: var(--muted);
+    }
+
+    .guide-value,
+    .guide-url {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 760;
+    }
+
+    .guide-url {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .form {
+      display: grid;
+      gap: 10px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    input {
+      width: 100%;
+      min-height: 42px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      background: #fff;
+      font: inherit;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    button {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--text);
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: var(--accent-strong);
+    }
+
+    button.danger {
+      color: var(--bad);
+    }
+
+    .scan-list {
+      display: grid;
+      gap: 8px;
+      max-height: 356px;
+      overflow: auto;
+    }
+
+    .network {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 10px;
+      width: 100%;
+      text-align: left;
+    }
+
+    .network strong {
+      overflow-wrap: anywhere;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .message {
+      min-height: 22px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .bad {
+      color: var(--bad);
+    }
+
+    .warn {
+      color: var(--warn);
+    }
+
+    @media (max-width: 760px) {
+      header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .status-pill {
+        text-align: left;
+      }
+
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SparkBot WiFi Config</h1>
+      <div id="state" class="status-pill">LOADING</div>
+    </header>
+
+    <div class="layout">
+      <section>
+        <h2>配网提示</h2>
+        <div class="setup-guide">
+          <div class="guide-step">
+            <span class="guide-label">先连接</span>
+            <strong id="guideApSsid" class="guide-value">--</strong>
+          </div>
+          <div class="guide-step">
+            <span class="guide-label">再打开</span>
+            <a id="guideUrl" class="guide-url" href="#">--</a>
+          </div>
+        </div>
+        <h2>设备状态</h2>
+        <div class="kv">
+          <span>配置热点</span><strong id="apSsid">--</strong>
+          <span>配置地址</span><strong id="apIp">--</strong>
+          <span>路由 SSID</span><strong id="staSsid">--</strong>
+          <span>路由地址</span><strong id="staIp">--</strong>
+          <span>信号强度</span><strong id="rssi">--</strong>
+          <span>最近状态</span><strong id="lastError">--</strong>
+        </div>
+        <div class="actions">
+          <button id="refreshBtn">刷新状态</button>
+          <button id="forgetBtn" class="danger">清除配置</button>
+        </div>
+        <div id="statusMsg" class="message"></div>
+      </section>
+
+      <section>
+        <h2>WiFi 配置</h2>
+        <form id="wifiForm" class="form">
+          <label>
+            SSID
+            <input id="ssid" name="ssid" maxlength="32" autocomplete="off" required>
+          </label>
+          <label>
+            Password
+            <input id="password" name="password" type="password" maxlength="63" autocomplete="current-password">
+          </label>
+          <label>
+            <span><input id="showPassword" type="checkbox" style="width:auto;min-height:auto"> 显示密码</span>
+          </label>
+          <div class="actions">
+            <button class="primary" type="submit">保存并连接</button>
+          </div>
+        </form>
+        <div id="formMsg" class="message"></div>
+      </section>
+
+      <section style="grid-column: 1 / -1;">
+        <h2>附近 WiFi</h2>
+        <div class="actions">
+          <button id="scanBtn">扫描 WiFi</button>
+        </div>
+        <div id="scanMsg" class="message"></div>
+        <div id="scanList" class="scan-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const stateClass = { connected: 'ok', connecting: 'warn', failed: 'bad', config: 'warn' };
+
+    function setMessage(el, text, type = '') {
+      el.className = 'message ' + type;
+      el.textContent = text;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (ch) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[ch]);
+    }
+
+    function webUrlFromStatus(s) {
+      const ip = s.ap_ip || '192.168.4.1';
+      const port = Number(s.http_port || 80);
+      return port === 80 ? `http://${ip}` : `http://${ip}:${port}`;
+    }
+
+    async function api(path, options) {
+      const res = await fetch(path, options);
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (e) {
+        throw new Error(text || 'Bad JSON');
+      }
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.message || res.statusText);
+      }
+      return data;
+    }
+
+    async function refreshStatus() {
+      try {
+        const s = await api('/api/status');
+        $('state').textContent = s.state.toUpperCase();
+        $('state').className = 'status-pill ' + (stateClass[s.state] || '');
+        const setupUrl = webUrlFromStatus(s);
+        $('guideApSsid').textContent = s.ap_ssid || '--';
+        $('guideUrl').textContent = setupUrl;
+        $('guideUrl').href = setupUrl;
+        $('apSsid').textContent = s.ap_ssid || '--';
+        $('apIp').textContent = s.ap_ip || '--';
+        $('staSsid').textContent = s.ssid || '--';
+        $('staIp').textContent = s.sta_ip || '--';
+        $('rssi').textContent = s.rssi ? `${s.rssi} dBm` : '--';
+        $('lastError').textContent = s.last_error || '--';
+        setMessage($('statusMsg'), s.state === 'config' ? '等待填写路由器 WiFi' : `retry: ${s.retry}, configured: ${s.configured ? 'yes' : 'no'}`);
+      } catch (err) {
+        setMessage($('statusMsg'), err.message, 'bad');
+      }
+    }
+
+    async function scanWifi() {
+      $('scanBtn').disabled = true;
+      setMessage($('scanMsg'), '扫描中...');
+      $('scanList').innerHTML = '';
+      try {
+        const data = await api('/api/scan');
+        if (!data.aps || data.aps.length === 0) {
+          setMessage($('scanMsg'), '没有扫描到可显示的 WiFi', 'warn');
+          return;
+        }
+        setMessage($('scanMsg'), `发现 ${data.aps.length} 个 WiFi`);
+        $('scanList').innerHTML = data.aps.map((ap, index) => `
+          <button class="network" data-index="${index}">
+            <strong>${escapeHtml(ap.ssid || '(hidden)')}</strong>
+            <span>${escapeHtml(ap.rssi)} dBm</span>
+            <span class="meta">${escapeHtml(ap.auth)}</span>
+            <span class="meta">CH ${escapeHtml(ap.channel)}</span>
+          </button>
+        `).join('');
+        document.querySelectorAll('.network').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const ap = data.aps[Number(btn.dataset.index)];
+            $('ssid').value = ap ? ap.ssid : '';
+            $('password').focus();
+          });
+        });
+      } catch (err) {
+        setMessage($('scanMsg'), err.message, 'bad');
+      } finally {
+        $('scanBtn').disabled = false;
+      }
+    }
+
+    $('wifiForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const body = new URLSearchParams(new FormData(event.currentTarget));
+      setMessage($('formMsg'), '正在提交...');
+      try {
+        await api('/api/wifi', { method: 'POST', body });
+        setMessage($('formMsg'), '已保存，正在连接...', 'ok');
+        await refreshStatus();
+      } catch (err) {
+        setMessage($('formMsg'), err.message, 'bad');
+      }
+    });
+
+    $('forgetBtn').addEventListener('click', async () => {
+      setMessage($('statusMsg'), '正在清除...');
+      try {
+        await api('/api/forget', { method: 'POST' });
+        setMessage($('statusMsg'), '配置已清除', 'ok');
+        await refreshStatus();
+      } catch (err) {
+        setMessage($('statusMsg'), err.message, 'bad');
+      }
+    });
+
+    $('refreshBtn').addEventListener('click', refreshStatus);
+    $('scanBtn').addEventListener('click', scanWifi);
+    $('showPassword').addEventListener('change', (event) => {
+      $('password').type = event.target.checked ? 'text' : 'password';
+    });
+
+    refreshStatus();
+    scanWifi();
+    setInterval(refreshStatus, 1800);
+  </script>
+</body>
+</html>

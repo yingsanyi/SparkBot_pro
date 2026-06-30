@@ -1,0 +1,43 @@
+menu "SparkBot Web Car Control"
+
+    config SPARKBOT_WEB_CAR_AP_SSID_PREFIX
+        string "SoftAP SSID prefix"
+        default "SparkBot-Car"
+        help
+            The final SSID appends the last two bytes of the SoftAP MAC,
+            for example SparkBot-Car-A1B2.
+
+    config SPARKBOT_WEB_CAR_AP_PASSWORD
+        string "SoftAP password"
+        default "12345678"
+        help
+            Leave empty for an open AP. Use at least 8 characters when a
+            password is configured.
+
+    config SPARKBOT_WEB_CAR_AP_CHANNEL
+        int "SoftAP channel"
+        default 6
+        range 1 13
+
+    config SPARKBOT_WEB_CAR_HTTP_PORT
+        int "HTTP server port"
+        default 80
+        range 1 65535
+
+    config SPARKBOT_WEB_CAR_COMMAND_PERIOD_MS
+        int "Motion command repeat period in ms"
+        default 100
+        range 50 500
+        help
+            While the car is moving, the head controller repeats the current
+            motion command periodically.
+
+    config SPARKBOT_WEB_CAR_DEADMAN_MS
+        int "Motion command timeout in ms"
+        default 650
+        range 200 3000
+        help
+            If no new motion command arrives in this time window, the head
+            controller sends x0 y0 to stop the chassis.
+
+endmenu

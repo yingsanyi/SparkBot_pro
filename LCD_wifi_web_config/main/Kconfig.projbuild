@@ -1,0 +1,29 @@
+menu "SparkBot Web WiFi Config"
+
+    config SPARKBOT_WEB_CONFIG_AP_SSID
+        string "SoftAP SSID for WiFi setup"
+        default "SparkBot-Config"
+
+    config SPARKBOT_WEB_CONFIG_AP_PASSWORD
+        string "SoftAP password for WiFi setup"
+        default "12345678"
+        help
+            Leave empty to create an open setup network. Use at least 8
+            characters when a password is configured.
+
+    config SPARKBOT_WEB_CONFIG_AP_CHANNEL
+        int "SoftAP channel"
+        default 6
+        range 1 13
+
+    config SPARKBOT_WEB_CONFIG_MAX_STA_RETRY
+        int "Station connect retry count"
+        default 8
+        range 0 30
+
+    config SPARKBOT_WEB_CONFIG_HTTP_PORT
+        int "HTTP server port"
+        default 80
+        range 1 65535
+
+endmenu
