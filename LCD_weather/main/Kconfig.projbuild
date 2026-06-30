@@ -1,0 +1,15 @@
+menu "Example Configuration"
+
+    config QWEATHER_REQUEST_KEY
+        string "QWEATHER REQUEST KEY"
+        default "key"
+        help
+            Get weather information from QWeather server
+
+    config QWEATHER_API_HOST
+        string "QWEATHER API HOST"
+        default "your_api_host"
+        help
+            QWeather API Host from the QWeather console, for example abc1234xyz.def.qweatherapi.com
+
+endmenu

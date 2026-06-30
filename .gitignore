@@ -1,5 +1,6 @@
 # ESP-IDF build outputs
 **/build/
+LCD_weather_voice_control/build_factory_reuse*/
 **/managed_components/
 **/sdkconfig.old
 

@@ -1,0 +1,13 @@
+## IDF Component Manager Manifest File
+dependencies:
+  espressif/button:
+    version: 3.4.0
+  esp_mmap_assets: 1.*
+  esp_lv_decoder: 0.1.*
+  lvgl/lvgl: 8.*
+  espressif/zlib: ^1
+  esp_sparkbot_bsp: '*'
+  espressif/adc_battery_estimation: ^0.2.0
+
+  protocol_examples_common:
+    path: ${IDF_PATH}/examples/common_components/protocol_examples_common

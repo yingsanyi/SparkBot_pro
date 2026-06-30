@@ -1,0 +1,12 @@
+menu "LCD Blink Configuration"
+
+    config LCD_BLINK_PERIOD_MS
+        int "LCD blink period (ms)"
+        range 10 3600000
+        default 1000
+        help
+            Period in milliseconds for the LCD backlight blink cycle.
+            One period consists of backlight ON (half period) and OFF (half period).
+            For example, a value of 1000 means 500 ms on, 500 ms off.
+
+endmenu

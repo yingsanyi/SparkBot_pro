@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>番茄钟</title>
+  <style>
+    /* ===== 全局样式 ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      /* 深色渐变背景 */
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 20px;
+    }
+
+    /* ===== 主容器 ===== */
+    .container {
+      text-align: center;
+      max-width: 420px;
+      width: 100%;
+    }
+
+    /* ===== 今日统计 ===== */
+    .stats-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .today-count {
+      font-size: 0.95rem;
+      color: #8ab4f8;
+      letter-spacing: 1px;
+    }
+
+    .btn-clear {
+      padding: 6px 18px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50px;
+      cursor: pointer;
+      background: transparent;
+      color: #999;
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+    }
+
+    .btn-clear:hover {
+      color: #e05a6f;
+      border-color: #e05a6f;
+      box-shadow: 0 4px 12px rgba(224, 90, 111, 0.25);
+    }
+
+    /* ===== 任务输入框 ===== */
+    .task-input {
+      width: 100%;
+      padding: 12px 18px;
+      font-size: 0.95rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #ddd;
+      outline: none;
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+      margin-bottom: 24px;
+    }
+
+    .task-input::placeholder {
+      color: #666;
+    }
+
+    .task-input:focus {
+      border-color: rgba(78, 240, 142, 0.5);
+      box-shadow: 0 0 12px rgba(78, 240, 142, 0.1);
+    }
+
+    /* ===== 历史记录 ===== */
+    .history {
+      margin-top: 36px;
+      text-align: left;
+    }
+
+    .history-title {
+      font-size: 0.85rem;
+      color: #777;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .history-list {
+      list-style: none;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .history-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .history-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      margin-bottom: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 10px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .history-task {
+      color: #ccc;
+      font-size: 0.9rem;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .history-time {
+      color: #777;
+      font-size: 0.78rem;
+      margin-left: 12px;
+      flex-shrink: 0;
+    }
+
+    @keyframes fadeIn {
+      0% { opacity: 0; transform: translateY(-8px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .history-empty {
+      text-align: center;
+      color: #555;
+      font-size: 0.85rem;
+      padding: 16px 0;
+    }
+
+    /* ===== 状态提示文字 ===== */
+    .status {
+      font-size: 1.5rem;
+      color: #bbb;
+      margin-bottom: 20px;
+      letter-spacing: 2px;
+      transition: color 0.4s, transform 0.4s;
+      min-height: 2.2rem;
+    }
+
+    .status.work {
+      color: #4ef08e;
+    }
+
+    .status.break {
+      color: #f0b44e;
+    }
+
+    /* 状态切换时的弹跳动画 */
+    .status.bounce {
+      animation: bounceIn 0.5s ease;
+    }
+
+    @keyframes bounceIn {
+      0% { transform: scale(0.8); opacity: 0; }
+      60% { transform: scale(1.05); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* ===== 倒计时数字 ===== */
+    .timer {
+      font-size: clamp(4rem, 12vw, 7rem);
+      font-weight: 700;
+      color: #ffffff;
+      /* 白色发光效果 */
+      text-shadow:
+        0 0 10px rgba(255, 255, 255, 0.3),
+        0 0 30px rgba(255, 255, 255, 0.1);
+      letter-spacing: 6px;
+      margin-bottom: 36px;
+      user-select: none;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== 按钮容器 ===== */
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* ===== 按钮基础样式 ===== */
+    .btn {
+      padding: 12px 32px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+      outline: none;
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 开始按钮 */
+    .btn-start {
+      background: linear-gradient(135deg, #4ef08e, #2dce6e);
+      box-shadow: 0 4px 15px rgba(78, 240, 142, 0.3);
+    }
+
+    .btn-start:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(78, 240, 142, 0.45);
+    }
+
+    .btn-start:active {
+      transform: translateY(0);
+    }
+
+    /* 暂停按钮 */
+    .btn-pause {
+      background: linear-gradient(135deg, #f0b44e, #e09c2e);
+      box-shadow: 0 4px 15px rgba(240, 180, 78, 0.3);
+    }
+
+    .btn-pause:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(240, 180, 78, 0.45);
+    }
+
+    .btn-pause:active {
+      transform: translateY(0);
+    }
+
+    /* 重置按钮 */
+    .btn-reset {
+      background: linear-gradient(135deg, #e05a6f, #c0392b);
+      box-shadow: 0 4px 15px rgba(224, 90, 111, 0.3);
+    }
+
+    .btn-reset:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(224, 90, 111, 0.45);
+    }
+
+    .btn-reset:active {
+      transform: translateY(0);
+    }
+
+    /* 禁用态 */
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* 隐藏按钮 */
+    .btn-hidden {
+      display: none;
+    }
+
+    /* ===== 时长设置 ===== */
+    .settings {
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+      margin-bottom: 24px;
+    }
+
+    .setting-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .setting-label {
+      font-size: 0.78rem;
+      color: #777;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .stepper {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 2px;
+    }
+
+    .stepper-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: #999;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .stepper-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .stepper-val {
+      width: 32px;
+      text-align: center;
+      font-size: 0.9rem;
+      color: #ddd;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== 白噪音控制 ===== */
+    .noise-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
+    .noise-select {
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 50px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #ccc;
+      outline: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      letter-spacing: 1px;
+    }
+
+    .noise-select option {
+      background: #1a1a2e;
+      color: #ccc;
+    }
+
+    .noise-select:focus {
+      border-color: rgba(78, 160, 240, 0.5);
+    }
+
+    .btn-noise {
+      padding: 8px 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 50px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.05);
+      color: #ccc;
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+    }
+
+    .btn-noise:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(78, 160, 240, 0.2);
+    }
+
+    .btn-noise.active {
+      background: rgba(78, 160, 240, 0.2);
+      border-color: rgba(78, 160, 240, 0.4);
+      color: #8ab4f8;
+    }
+
+    /* ===== 响应式适配 ===== */
+    @media (max-width: 400px) {
+      .buttons {
+        gap: 10px;
+      }
+
+      .btn {
+        padding: 10px 24px;
+        font-size: 0.9rem;
+      }
+
+      .status {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 顶部：今日统计 + 清空按钮 -->
+    <div class="stats-bar">
+      <span class="today-count" id="todayCount">今日已完成 0 个番茄钟</span>
+      <button class="btn-clear" id="btnClear" onclick="clearHistory()">清空记录</button>
+    </div>
+
+    <!-- 任务输入框 -->
+    <input
+      type="text"
+      class="task-input"
+      id="taskInput"
+      placeholder="输入本次要完成的任务..."
+      maxlength="50"
+    />
+
+    <!-- 时长设置 -->
+    <div class="settings">
+      <div class="setting-item">
+        <span class="setting-label">工作</span>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="adjustDuration('work', -1)">−</button>
+          <span class="stepper-val" id="workMin">25</span>
+          <button class="stepper-btn" onclick="adjustDuration('work',  1)">+</button>
+        </div>
+        <span class="setting-label">分</span>
+      </div>
+      <div class="setting-item">
+        <span class="setting-label">休息</span>
+        <div class="stepper">
+          <button class="stepper-btn" onclick="adjustDuration('break', -1)">−</button>
+          <span class="stepper-val" id="breakMin">5</span>
+          <button class="stepper-btn" onclick="adjustDuration('break',  1)">+</button>
+        </div>
+        <span class="setting-label">分</span>
+      </div>
+    </div>
+
+    <!-- 状态提示 -->
+    <div class="status work" id="status">开始工作！</div>
+
+    <!-- 倒计时 -->
+    <div class="timer" id="timer">25:00</div>
+
+    <!-- 按钮区 -->
+    <div class="buttons">
+      <button class="btn btn-start" id="btnStart"    onclick="startTimer()">开始</button>
+      <button class="btn btn-pause" id="btnPause"    onclick="pauseTimer()" disabled>暂停</button>
+      <button class="btn btn-reset" id="btnReset"    onclick="resetTimer()">重置</button>
+    </div>
+
+    <!-- 白噪音 -->
+    <div class="noise-bar">
+      <select class="noise-select" id="noiseType" onchange="switchNoiseType()">
+        <option value="white">白噪音</option>
+        <option value="pink">粉噪音</option>
+        <option value="brown">棕噪音</option>
+        <option value="rain">雨声</option>
+      </select>
+      <button class="btn-noise" id="btnNoise" onclick="toggleNoise()">播放</button>
+    </div>
+
+    <!-- 历史记录 -->
+    <div class="history" id="historySection">
+      <div class="history-title">历史记录</div>
+      <ul class="history-list" id="historyList"></ul>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================
+     *  番茄钟 —— 核心逻辑 + 历史记录
+     * ========================================== */
+
+    // ----- 配置 -----
+    const WORK_DEFAULT = 25;   // 默认工作时间（分钟）
+    const BREAK_DEFAULT = 5;   // 默认休息时间（分钟）
+    let workMinutes = WORK_DEFAULT;   // 当前工作时间（可调）
+    let breakMinutes = BREAK_DEFAULT; // 当前休息时间（可调）
+    const STORAGE_KEY = 'pomodoro_history'; // localStorage 键名
+
+    // ----- 计时器状态 -----
+    let isWorking = true;
+    let remainingSeconds = workMinutes * 60;
+    let timerId = null;
+    let isPaused = false;
+
+    // ----- DOM 元素 -----
+    const timerEl     = document.getElementById('timer');
+    const statusEl    = document.getElementById('status');
+    const btnStart    = document.getElementById('btnStart');
+    const btnPause    = document.getElementById('btnPause');
+    const taskInput   = document.getElementById('taskInput');
+    const todayCount  = document.getElementById('todayCount');
+    const historyList = document.getElementById('historyList');
+    const workMinEl   = document.getElementById('workMin');
+    const breakMinEl  = document.getElementById('breakMin');
+    const noiseTypeEl = document.getElementById('noiseType');
+    const btnNoise    = document.getElementById('btnNoise');
+
+    // ==================== 历史记录（localStorage） ====================
+
+    /** 从 localStorage 读取全部历史记录 */
+    function getHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    /** 保存全部历史记录到 localStorage */
+    function saveHistory(records) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    /** 获取今天日期字符串，格式 YYYY-MM-DD */
+    function getTodayStr() {
+      const d = new Date();
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+
+    /** 获取当前时间字符串，格式 HH:MM */
+    function getTimeStr() {
+      const d = new Date();
+      return String(d.getHours()).padStart(2, '0') + ':' +
+        String(d.getMinutes()).padStart(2, '0');
+    }
+
+    /** 记录一个完成的番茄钟：写入 localStorage 并刷新界面 */
+    function recordPomodoro(taskName) {
+      const records = getHistory();
+      records.unshift({
+        task: taskName,
+        time: getTimeStr(),
+        date: getTodayStr()
+      });
+      saveHistory(records);
+      renderHistory();
+      updateTodayCount();
+    }
+
+    /** 渲染历史列表 */
+    function renderHistory() {
+      const records = getHistory();
+      historyList.innerHTML = '';
+
+      if (records.length === 0) {
+        historyList.innerHTML = '<div class="history-empty">暂无记录</div>';
+        return;
+      }
+
+      records.forEach(function (r) {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        li.innerHTML = '<span class="history-task">' + escapeHTML(r.task) + '</span>' +
+          '<span class="history-time">' + escapeHTML(r.date + ' ' + r.time) + '</span>';
+        historyList.appendChild(li);
+      });
+    }
+
+    /** 更新今日统计数字 */
+    function updateTodayCount() {
+      const today = getTodayStr();
+      const records = getHistory();
+      const count = records.filter(function (r) {
+        return r.date === today;
+      }).length;
+      todayCount.textContent = '今日已完成 ' + count + ' 个番茄钟';
+    }
+
+    /** 清空全部历史记录 */
+    function clearHistory() {
+      saveHistory([]);
+      renderHistory();
+      updateTodayCount();
+    }
+
+    /** 简单防 XSS */
+    function escapeHTML(str) {
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ==================== 辅助函数 ====================
+
+    /** 将秒数格式化为 MM:SS */
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    /** 更新页面上的计时器显示 */
+    function updateDisplay() {
+      timerEl.textContent = formatTime(remainingSeconds);
+    }
+
+    /** 切换状态提示文字与样式 */
+    function setStatus(working) {
+      statusEl.textContent = working ? '开始工作！' : '休息一下！';
+      statusEl.className = 'status ' + (working ? 'work' : 'break');
+
+      statusEl.classList.remove('bounce');
+      void statusEl.offsetWidth;
+      statusEl.classList.add('bounce');
+    }
+
+    /** 更新按钮状态 */
+    function updateButtons(running) {
+      if (running) {
+        btnStart.textContent = '继续';
+        btnPause.disabled = false;
+      } else {
+        btnStart.textContent = isPaused ? '继续' : '开始';
+        btnPause.disabled = true;
+      }
+    }
+
+    // ==================== 计时器核心 ====================
+
+    function clearTimer() {
+      if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+    }
+
+    /** 每秒回调 */
+    function tick() {
+      remainingSeconds--;
+
+      if (remainingSeconds <= 0) {
+        // 如果是工作阶段结束 → 记录完成的番茄钟
+        if (isWorking) {
+          const task = taskInput.value.trim() || '未命名任务';
+          recordPomodoro(task);
+        }
+
+        clearInterval(timerId);
+        switchMode();
+        updateButtons(true);
+        timerId = setInterval(tick, 1000);
+        return;
+      }
+
+      updateDisplay();
+    }
+
+    function startTimer() {
+      if (timerId !== null) return;
+
+      isPaused = false;
+      updateButtons(true);
+      updateDisplay();
+      timerId = setInterval(tick, 1000);
+    }
+
+    function pauseTimer() {
+      if (timerId === null) return;
+
+      clearTimer();
+      isPaused = true;
+      updateButtons(false);
+    }
+
+    function resetTimer() {
+      clearTimer();
+      isWorking = true;
+      isPaused = false;
+      remainingSeconds = workMinutes * 60;
+
+      updateDisplay();
+      setStatus(true);
+      updateButtons(false);
+    }
+
+    function switchMode() {
+      isWorking = !isWorking;
+
+      remainingSeconds = isWorking
+        ? workMinutes * 60
+        : breakMinutes * 60;
+
+      setStatus(isWorking);
+      updateDisplay();
+    }
+
+    // ========== 自定义时长 ==========
+
+    /** 调整工作/休息时长，步进 1 分钟，范围 1-60 */
+    function adjustDuration(type, delta) {
+      if (timerId !== null) return; // 运行中不允许修改
+
+      if (type === 'work') {
+        workMinutes = Math.min(60, Math.max(1, workMinutes + delta));
+        workMinEl.textContent = workMinutes;
+      } else {
+        breakMinutes = Math.min(60, Math.max(1, breakMinutes + delta));
+        breakMinEl.textContent = breakMinutes;
+      }
+
+      // 仅当计时器未运行时更新剩余秒数
+      if (timerId === null) {
+        remainingSeconds = isWorking ? workMinutes * 60 : breakMinutes * 60;
+      }
+      updateDisplay();
+    }
+
+    // ========== 白噪音 / 背景音（Web Audio API） ==========
+
+    let audioCtx = null;
+    let noiseNode = null;
+    let noiseGain = null;
+    let isNoisePlaying = false;
+    let currentNoiseType = 'white';
+
+    // ---- 各噪音生成器的状态变量 ----
+    // 粉噪音: Paul Kellet 算法状态
+    let pinkB0 = 0, pinkB1 = 0, pinkB2 = 0, pinkB3 = 0, pinkB4 = 0, pinkB5 = 0, pinkB6 = 0;
+    // 棕噪音: 积分状态
+    let brownLast = 0;
+
+    /** 初始化 AudioContext（用户交互后首次调用） */
+    function ensureAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    /** 生成指定类型的噪音采样值 (-1 ~ 1) */
+    function generateNoise(type) {
+      switch (type) {
+        case 'white':
+          return (Math.random() * 2 - 1) * 0.6;
+
+        case 'pink': {
+          // Paul Kellet refined method
+          const white = Math.random() * 2 - 1;
+          pinkB0 = 0.99886 * pinkB0 + white * 0.0555179;
+          pinkB1 = 0.99332 * pinkB1 + white * 0.0750759;
+          pinkB2 = 0.96900 * pinkB2 + white * 0.1538520;
+          pinkB3 = 0.86650 * pinkB3 + white * 0.3104856;
+          pinkB4 = 0.55000 * pinkB4 + white * 0.5329522;
+          pinkB5 = -0.7616 * pinkB5 - white * 0.0168980;
+          return (pinkB0 + pinkB1 + pinkB2 + pinkB3 + pinkB4 + pinkB5 + pinkB6 + white * 0.5362) * 0.11;
+        }
+
+        case 'brown': {
+          const white = Math.random() * 2 - 1;
+          brownLast = (brownLast + (0.02 * white)) / 1.02;
+          return brownLast * 3.5;
+        }
+
+        case 'rain': {
+          // 用粉噪音模拟底层，叠加间歇性高频滴答
+          const white = Math.random() * 2 - 1;
+          const burst = Math.random() < 0.003 ? (Math.random() * 2 - 1) * 0.3 : 0;
+          pinkB0 = 0.99886 * pinkB0 + white * 0.0555179;
+          pinkB1 = 0.99332 * pinkB1 + white * 0.0750759;
+          pinkB2 = 0.96900 * pinkB2 + white * 0.1538520;
+          pinkB3 = 0.86650 * pinkB3 + white * 0.3104856;
+          pinkB4 = 0.55000 * pinkB4 + white * 0.5329522;
+          pinkB5 = -0.7616 * pinkB5 - white * 0.0168980;
+          const pink = (pinkB0 + pinkB1 + pinkB2 + pinkB3 + pinkB4 + pinkB5 + pinkB6 + white * 0.5362) * 0.08;
+          return pink + burst;
+        }
+
+        default:
+          return 0;
+      }
+    }
+
+    /** 重置粉/棕噪音状态 */
+    function resetNoiseState() {
+      pinkB0 = pinkB1 = pinkB2 = pinkB3 = pinkB4 = pinkB5 = pinkB6 = 0;
+      brownLast = 0;
+    }
+
+    /** 启动噪音 */
+    function startNoise() {
+      ensureAudioCtx();
+      if (isNoisePlaying) return;
+
+      // 恢复被暂停的 AudioContext（浏览器自动暂停策略）
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      resetNoiseState();
+
+      // 创建增益节点（音量控制）
+      noiseGain = audioCtx.createGain();
+      noiseGain.gain.value = 0.18;
+      noiseGain.connect(audioCtx.destination);
+
+      // 使用 ScriptProcessorNode 实时生成噪音
+      const bufferSize = 4096;
+      noiseNode = audioCtx.createScriptProcessor(bufferSize, 1, 1);
+      noiseNode.onaudioprocess = function (e) {
+        const output = e.outputBuffer.getChannelData(0);
+        for (let i = 0; i < output.length; i++) {
+          output[i] = generateNoise(currentNoiseType);
+        }
+      };
+      noiseNode.connect(noiseGain);
+
+      isNoisePlaying = true;
+      btnNoise.textContent = '暂停';
+      btnNoise.classList.add('active');
+    }
+
+    /** 停止噪音 */
+    function stopNoise() {
+      if (!isNoisePlaying) return;
+
+      if (noiseNode) {
+        noiseNode.disconnect();
+        noiseNode = null;
+      }
+      if (noiseGain) {
+        noiseGain.disconnect();
+        noiseGain = null;
+      }
+
+      isNoisePlaying = false;
+      btnNoise.textContent = '播放';
+      btnNoise.classList.remove('active');
+    }
+
+    function toggleNoise() {
+      if (isNoisePlaying) {
+        stopNoise();
+      } else {
+        startNoise();
+      }
+    }
+
+    function switchNoiseType() {
+      currentNoiseType = noiseTypeEl.value;
+      if (isNoisePlaying) {
+        // 切换类型时重置状态，避免上一类噪音的残余
+        resetNoiseState();
+      }
+    }
+    // ==================== 初始化 ====================
+    updateDisplay();
+    renderHistory();
+    updateTodayCount();
+  </script>
+</body>
+</html>
