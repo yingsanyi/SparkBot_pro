@@ -21,10 +21,11 @@
 #include "sdkconfig.h"
 #include "tracked_chassis_control.h"
 
-#define FORM_BODY_MAX_LEN 128
-#define WS_TEXT_MAX_LEN 64
-#define WIFI_SSID_FIELD_LEN 32
-#define WIFI_PASSWORD_FIELD_LEN 64
+#define FORM_BODY_MAX_LEN           128
+#define WS_TEXT_MAX_LEN             64
+#define WIFI_SSID_FIELD_LEN         32
+#define WIFI_AP_MAX_CLIENTS         4
+#define WIFI_AP_SUFFIX_CHARS        13
 
 typedef struct {
     float x;
@@ -120,6 +121,39 @@ static void lcd_post(lcd_face_scene_t scene, const char *line1, const char *line
     }
 }
 
+static void lcd_post_config_prompt(void)
+{
+    char ap_ssid[WIFI_SSID_FIELD_LEN + 1] = {0};
+
+    xSemaphoreTake(s_state_lock, portMAX_DELAY);
+    copy_string(ap_ssid, sizeof(ap_ssid), s_state.ap_ssid);
+    xSemaphoreGive(s_state_lock);
+
+    lcd_post(LCD_FACE_SCENE_IDLE, "JOIN AP", ap_ssid[0] ? ap_ssid : "CAR AP");
+}
+
+static void lcd_post_web_prompt(void)
+{
+    char ap_ip[16] = {0};
+    char web_addr[24] = {0};
+
+    xSemaphoreTake(s_state_lock, portMAX_DELAY);
+    copy_string(ap_ip, sizeof(ap_ip), s_state.ap_ip);
+    xSemaphoreGive(s_state_lock);
+
+    if (ap_ip[0] == '\0' || strcmp(ap_ip, "0.0.0.0") == 0) {
+        copy_string(ap_ip, sizeof(ap_ip), "192.168.4.1");
+    }
+
+    if (CONFIG_SPARKBOT_WEB_CAR_HTTP_PORT == 80) {
+        copy_string(web_addr, sizeof(web_addr), ap_ip);
+    } else {
+        snprintf(web_addr, sizeof(web_addr), "%s:%d", ap_ip, CONFIG_SPARKBOT_WEB_CAR_HTTP_PORT);
+    }
+
+    lcd_post(LCD_FACE_SCENE_SURPRISED, web_addr, "OPEN WEB");
+}
+
 static void lcd_status_task(void *arg)
 {
     (void)arg;
@@ -149,7 +183,6 @@ static size_t copy_wifi_field(uint8_t *dst, size_t dst_len, const char *src)
     memcpy(dst, src, src_len);
     return src_len;
 }
-
 static void state_set_motion(float x, float y)
 {
     x = clamp_float(x, -1.0f, 1.0f);
@@ -301,18 +334,23 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
     if (event_id == WIFI_EVENT_AP_START) {
         update_ap_ip_string();
-        ESP_LOGI(TAG, "SoftAP started");
-        lcd_post(LCD_FACE_SCENE_IDLE, "OPEN WEB", "192.168.4.1");
+        xSemaphoreTake(s_state_lock, portMAX_DELAY);
+        s_state.ap_clients = 0;
+        xSemaphoreGive(s_state_lock);
+        ESP_LOGI(TAG, "Car AP started: %s, http://%s", s_state.ap_ssid, s_state.ap_ip);
+        lcd_post_config_prompt();
         return;
     }
 
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         xSemaphoreTake(s_state_lock, portMAX_DELAY);
-        s_state.ap_clients++;
+        if (s_state.ap_clients < WIFI_AP_MAX_CLIENTS) {
+            s_state.ap_clients++;
+        }
         const int clients = s_state.ap_clients;
         xSemaphoreGive(s_state_lock);
         ESP_LOGI(TAG, "Browser device joined AP, clients=%d", clients);
-        lcd_post(LCD_FACE_SCENE_HAPPY, "PHONE", "CONNECTED");
+        lcd_post_web_prompt();
         return;
     }
 
@@ -325,28 +363,49 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         xSemaphoreGive(s_state_lock);
         state_stop_motion();
         ESP_LOGI(TAG, "Browser device left AP, clients=%d", clients);
-        lcd_post(LCD_FACE_SCENE_IDLE, "OPEN WEB", "192.168.4.1");
+        if (clients > 0) {
+            lcd_post_web_prompt();
+        } else {
+            lcd_post_config_prompt();
+        }
     }
 }
 
-static void build_ap_ssid(void)
+static void build_ap_ssid(char *ssid, size_t ssid_len)
 {
-    uint8_t mac[6] = {0};
-    char ssid[WIFI_SSID_FIELD_LEN + 1] = {0};
+    if (ssid_len == 0) {
+        return;
+    }
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP));
-    snprintf(ssid, sizeof(ssid), "%s-%02X%02X",
-             CONFIG_SPARKBOT_WEB_CAR_AP_SSID_PREFIX, mac[4], mac[5]);
+    const char *base = CONFIG_SPARKBOT_WEB_CAR_AP_SSID_PREFIX;
+    if (!base || base[0] == '\0') {
+        base = "SparkBot-Car";
+    }
+
+    uint8_t mac[6] = {0};
+    esp_err_t err = esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Read SoftAP MAC failed: %s, use base AP SSID", esp_err_to_name(err));
+        copy_string(ssid, ssid_len, base);
+        return;
+    }
+
+    const size_t max_ssid_chars = ssid_len - 1;
+    const size_t max_base_len = max_ssid_chars > WIFI_AP_SUFFIX_CHARS ? max_ssid_chars - WIFI_AP_SUFFIX_CHARS : 0;
+    size_t base_len = strlen(base);
+    if (base_len > max_base_len) {
+        base_len = max_base_len;
+    }
+
+    snprintf(ssid, ssid_len, "%.*s-%02X%02X%02X%02X%02X%02X",
+             (int)base_len, base, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     xSemaphoreTake(s_state_lock, portMAX_DELAY);
     copy_string(s_state.ap_ssid, sizeof(s_state.ap_ssid), ssid);
     xSemaphoreGive(s_state_lock);
 }
-
 static esp_err_t wifi_start_softap(void)
 {
-    build_ap_ssid();
-
     ESP_RETURN_ON_ERROR(esp_netif_init(), TAG, "esp_netif_init failed");
     ESP_RETURN_ON_ERROR(esp_event_loop_create_default(), TAG, "create event loop failed");
 
@@ -359,20 +418,17 @@ static esp_err_t wifi_start_softap(void)
                         TAG, "register wifi event failed");
 
     char ap_ssid[WIFI_SSID_FIELD_LEN + 1] = {0};
-    xSemaphoreTake(s_state_lock, portMAX_DELAY);
-    copy_string(ap_ssid, sizeof(ap_ssid), s_state.ap_ssid);
-    xSemaphoreGive(s_state_lock);
+    build_ap_ssid(ap_ssid, sizeof(ap_ssid));
 
     wifi_config_t ap_config = {0};
     ap_config.ap.ssid_len = copy_wifi_field(ap_config.ap.ssid, sizeof(ap_config.ap.ssid), ap_ssid);
     ap_config.ap.channel = CONFIG_SPARKBOT_WEB_CAR_AP_CHANNEL;
-    ap_config.ap.max_connection = 4;
+    ap_config.ap.max_connection = WIFI_AP_MAX_CLIENTS;
     ap_config.ap.pmf_cfg.required = false;
 
     const size_t password_len = strlen(CONFIG_SPARKBOT_WEB_CAR_AP_PASSWORD);
     if (password_len >= 8) {
-        copy_wifi_field(ap_config.ap.password, sizeof(ap_config.ap.password),
-                        CONFIG_SPARKBOT_WEB_CAR_AP_PASSWORD);
+        copy_wifi_field(ap_config.ap.password, sizeof(ap_config.ap.password), CONFIG_SPARKBOT_WEB_CAR_AP_PASSWORD);
         ap_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
     } else {
         if (password_len > 0) {
@@ -386,7 +442,7 @@ static esp_err_t wifi_start_softap(void)
     ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "wifi start failed");
     update_ap_ip_string();
 
-    ESP_LOGI(TAG, "Open http://%s after joining SSID %s", s_state.ap_ip, ap_ssid);
+    ESP_LOGI(TAG, "Join SSID %s, then open http://%s", ap_ssid, s_state.ap_ip);
     return ESP_OK;
 }
 
@@ -426,13 +482,14 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     format_fixed_2(x_text, sizeof(x_text), snapshot.x);
     format_fixed_2(y_text, sizeof(y_text), snapshot.y);
 
-    char body[384];
+    char body[448];
     snprintf(body, sizeof(body),
-             "{\"ok\":true,\"ap_ssid\":\"%s\",\"ap_ip\":\"%s\",\"clients\":%d,"
-             "\"x\":%s,\"y\":%s,\"moving\":%s,\"light_mode\":%d,"
-             "\"dance_mode\":%d,\"motion_seq\":%lu,\"last_command\":\"%s\"}",
+             "{\"ok\":true,\"ap_ssid\":\"%s\",\"ap_ip\":\"%s\",\"http_port\":%d,\"clients\":%d,"
+             "\"x\":%s,\"y\":%s,\"moving\":%s,\"light_mode\":%d,\"dance_mode\":%d,"
+             "\"motion_seq\":%lu,\"last_command\":\"%s\"}",
              snapshot.ap_ssid,
              snapshot.ap_ip,
+             CONFIG_SPARKBOT_WEB_CAR_HTTP_PORT,
              snapshot.ap_clients,
              x_text,
              y_text,
@@ -532,7 +589,6 @@ static bool form_get_value(const char *body, const char *key, char *out, size_t 
 
     return false;
 }
-
 static bool form_get_float(const char *body, const char *key, float *out)
 {
     char value[24];
@@ -735,7 +791,6 @@ static esp_err_t ws_handler(httpd_req_t *req)
     free(buf);
     return err;
 }
-
 static esp_err_t http_server_start(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -788,16 +843,16 @@ static esp_err_t http_server_start(void)
         .is_websocket = true,
     };
 
-    ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &root_uri), TAG, "register root failed");
+    ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &root_uri), TAG, "register / failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &status_uri), TAG, "register status failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &move_uri), TAG, "register move failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &stop_uri), TAG, "register stop failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &light_uri), TAG, "register light failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &dance_uri), TAG, "register dance failed");
     ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &correction_uri), TAG, "register correction failed");
-    ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &ws_uri), TAG, "register ws failed");
+    ESP_RETURN_ON_ERROR(httpd_register_uri_handler(s_httpd, &ws_uri), TAG, "register websocket failed");
 
-    ESP_LOGI(TAG, "HTTP server started on port %d", CONFIG_SPARKBOT_WEB_CAR_HTTP_PORT);
+    ESP_LOGI(TAG, "HTTP server started on http://%s:%d", s_state.ap_ip, config.server_port);
     return ESP_OK;
 }
 
@@ -820,10 +875,9 @@ void app_main(void)
     s_state_lock = xSemaphoreCreateMutex();
     ESP_ERROR_CHECK(s_state_lock ? ESP_OK : ESP_ERR_NO_MEM);
 
-    s_lcd_queue = xQueueCreate(8, sizeof(lcd_status_msg_t));
+    s_lcd_queue = xQueueCreate(4, sizeof(lcd_status_msg_t));
     ESP_ERROR_CHECK(s_lcd_queue ? ESP_OK : ESP_ERR_NO_MEM);
-    ESP_ERROR_CHECK(xTaskCreate(lcd_status_task, "lcd_status", 4096, NULL, 4, NULL) == pdPASS
-                    ? ESP_OK : ESP_FAIL);
+    xTaskCreate(lcd_status_task, "lcd_status", 4096, NULL, 4, NULL);
 
     xSemaphoreTake(s_state_lock, portMAX_DELAY);
     s_state.last_motion_tick = xTaskGetTickCount();
@@ -833,8 +887,7 @@ void app_main(void)
     ESP_ERROR_CHECK(wifi_start_softap());
     ESP_ERROR_CHECK(http_server_start());
 
-    ESP_ERROR_CHECK(xTaskCreate(motion_keepalive_task, "motion_keepalive", 3072, NULL, 5, NULL) == pdPASS
-                    ? ESP_OK : ESP_FAIL);
+    xTaskCreate(motion_keepalive_task, "motion_keepalive", 4096, NULL, 5, NULL);
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));

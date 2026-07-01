@@ -7,22 +7,18 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f4f7f6;
+      --bg: #f3f6f5;
       --surface: #ffffff;
-      --line: #d7dfdf;
+      --line: #d6dfdc;
       --text: #172026;
-      --muted: #607077;
+      --muted: #5b6d72;
       --accent: #0f766e;
-      --accent-strong: #0b5f59;
-      --warn: #b7791f;
+      --accent-strong: #0a5f59;
+      --ok: #16803d;
+      --warn: #a16207;
       --bad: #b42318;
-      --ok: #15803d;
     }
-
-    * {
-      box-sizing: border-box;
-    }
-
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
@@ -30,112 +26,13 @@
       color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-
-    main {
-      width: min(1080px, calc(100% - 24px));
-      margin: 0 auto;
-      padding: 18px 0 28px;
-    }
-
-    header {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 14px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: clamp(24px, 4vw, 34px);
-      letter-spacing: 0;
-    }
-
-    .pill {
-      min-width: 128px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px 12px;
-      background: var(--surface);
-      font-weight: 760;
-      text-align: center;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 14px;
-    }
-
-    section {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--surface);
-      padding: 16px;
-    }
-
-    h2 {
-      margin: 0 0 12px;
-      font-size: 17px;
-      letter-spacing: 0;
-    }
-
-    .status-grid {
-      display: grid;
-      grid-template-columns: 110px 1fr;
-      gap: 8px 10px;
-      font-size: 14px;
-    }
-
-    .status-grid span:nth-child(odd) {
-      color: var(--muted);
-    }
-
-    .pad-wrap {
-      display: grid;
-      grid-template-columns: minmax(220px, 320px) 1fr;
-      gap: 16px;
-      align-items: center;
-    }
-
-    .pad {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 1;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background:
-        linear-gradient(90deg, transparent calc(50% - 1px), #d9e2e2 50%, transparent calc(50% + 1px)),
-        linear-gradient(0deg, transparent calc(50% - 1px), #d9e2e2 50%, transparent calc(50% + 1px)),
-        #eef4f3;
-      touch-action: none;
-      user-select: none;
-    }
-
-    .stick {
-      position: absolute;
-      width: 70px;
-      height: 70px;
-      left: calc(50% - 35px);
-      top: calc(50% - 35px);
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 8px 18px rgba(15, 118, 110, 0.25);
-      pointer-events: none;
-      transform: translate(0, 0);
-    }
-
-    .dpad {
-      display: grid;
-      grid-template-columns: repeat(3, 58px);
-      grid-template-rows: repeat(3, 52px);
-      gap: 8px;
-      justify-content: center;
-      margin-bottom: 14px;
-    }
-
+    main { width: min(1080px, calc(100% - 24px)); margin: 0 auto; padding: 18px 0 28px; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+    h1 { margin: 0; font-size: clamp(24px, 4vw, 34px); letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 17px; letter-spacing: 0; }
+    section { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 16px; }
     button {
-      min-height: 40px;
+      min-height: 42px;
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 8px 12px;
@@ -145,79 +42,60 @@
       font-weight: 700;
       cursor: pointer;
     }
-
-    button:active,
-    button.active {
-      border-color: var(--accent);
-      background: var(--accent);
-      color: #fff;
-    }
-
-    .stop {
-      background: #fff5f5;
-      color: var(--bad);
-    }
-
-    .slider-row {
-      display: grid;
-      grid-template-columns: 72px 1fr 48px;
-      gap: 8px;
-      align-items: center;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    input[type="range"] {
+    button.primary, button:active, button.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+    button.primary:hover { background: var(--accent-strong); }
+    button.danger { background: #fff5f5; color: var(--bad); }
+    .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill { min-width: 112px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; background: var(--surface); font-weight: 760; text-align: center; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .layout { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 14px; }
+    .wide { grid-column: 1 / -1; }
+    .guide { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .guide-item { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #f8fbfa; }
+    .label { color: var(--muted); font-size: 13px; margin-bottom: 5px; }
+    .value { display: block; min-width: 0; overflow-wrap: anywhere; font-weight: 800; }
+    a.value { color: var(--accent); text-decoration: none; }
+    .status-grid { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 8px 10px; font-size: 14px; }
+    .status-grid span:nth-child(odd) { color: var(--muted); }
+    .status-grid strong { min-width: 0; overflow-wrap: anywhere; }
+    .pad-wrap { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: 16px; align-items: center; }
+    .pad {
+      position: relative;
       width: 100%;
-      accent-color: var(--accent);
+      aspect-ratio: 1;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, transparent calc(50% - 1px), #d8e3e0 50%, transparent calc(50% + 1px)),
+        linear-gradient(0deg, transparent calc(50% - 1px), #d8e3e0 50%, transparent calc(50% + 1px)),
+        #eef5f3;
+      touch-action: none;
+      user-select: none;
     }
-
-    .mode-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+    .stick {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      left: calc(50% - 35px);
+      top: calc(50% - 35px);
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 8px 18px rgba(15, 118, 110, 0.24);
+      pointer-events: none;
+      transform: translate(0, 0);
     }
-
-    .tools {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 14px;
-    }
-
-    .message {
-      min-height: 22px;
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .ok {
-      color: var(--ok);
-    }
-
-    .warn {
-      color: var(--warn);
-    }
-
-    .bad {
-      color: var(--bad);
-    }
-
-    @media (max-width: 820px) {
-      header {
-        align-items: stretch;
-        flex-direction: column;
-      }
-
-      .pill {
-        text-align: left;
-      }
-
-      .layout,
-      .pad-wrap {
-        grid-template-columns: 1fr;
-      }
+    .dpad { display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 52px); gap: 8px; justify-content: center; margin-bottom: 14px; }
+    .slider-row { display: grid; grid-template-columns: 72px 1fr 48px; gap: 8px; align-items: center; color: var(--muted); font-size: 14px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .mode-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .message { min-height: 22px; margin-top: 10px; color: var(--muted); font-size: 14px; }
+    @media (max-width: 860px) {
+      header { align-items: stretch; flex-direction: column; }
+      .pill { text-align: left; }
+      .layout, .pad-wrap, .guide { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -225,36 +103,33 @@
   <main>
     <header>
       <h1>SparkBot Car Control</h1>
-      <div id="wsState" class="pill warn">CONNECTING</div>
+      <div class="pills">
+        <div id="apState" class="pill warn">AP</div>
+        <div id="wsState" class="pill warn">WS</div>
+      </div>
     </header>
 
     <div class="layout">
       <section>
-        <h2>运动控制</h2>
-        <div class="pad-wrap">
-          <div id="pad" class="pad">
-            <div id="stick" class="stick"></div>
+        <h2>连接提示</h2>
+        <div class="guide">
+          <div class="guide-item">
+            <div class="label">先连接小车热点</div>
+            <strong id="guideApSsid" class="value">--</strong>
           </div>
-          <div>
-            <div class="dpad">
-              <span></span>
-              <button data-x="0" data-y="1">↑</button>
-              <span></span>
-              <button data-x="-1" data-y="0">←</button>
-              <button id="stopBtn" class="stop">■</button>
-              <button data-x="1" data-y="0">→</button>
-              <span></span>
-              <button data-x="0" data-y="-1">↓</button>
-              <span></span>
-            </div>
-            <div class="slider-row">
-              <span>速度</span>
-              <input id="speed" type="range" min="20" max="100" value="70">
-              <strong id="speedText">70%</strong>
-            </div>
-            <div id="moveMsg" class="message"></div>
+          <div class="guide-item">
+            <div class="label">再打开控制网页</div>
+            <a id="guideUrl" class="value" href="#">--</a>
           </div>
         </div>
+        <div class="status-grid">
+          <span>热点名称</span><strong id="apSsid">--</strong>
+          <span>访问地址</span><strong id="apIp">--</strong>
+          <span>连接设备</span><strong id="clients">--</strong>
+          <span>最近命令</span><strong id="lastCommand">--</strong>
+        </div>
+        <div class="tools"><button id="refreshBtn">刷新状态</button></div>
+        <div id="statusMsg" class="message"></div>
       </section>
 
       <section>
@@ -268,17 +143,26 @@
         <div id="lightMsg" class="message"></div>
       </section>
 
-      <section style="grid-column: 1 / -1;">
-        <h2>设备状态</h2>
-        <div class="status-grid">
-          <span>控制热点</span><strong id="apSsid">--</strong>
-          <span>访问地址</span><strong id="apIp">--</strong>
-          <span>连接设备</span><strong id="clients">--</strong>
-          <span>运动向量</span><strong id="vector">--</strong>
-          <span>灯光模式</span><strong id="lightMode">--</strong>
-          <span>最近命令</span><strong id="lastCommand">--</strong>
+      <section class="wide">
+        <h2>运动控制</h2>
+        <div class="pad-wrap">
+          <div id="pad" class="pad"><div id="stick" class="stick"></div></div>
+          <div>
+            <div class="dpad">
+              <span></span><button data-x="0" data-y="1">前</button><span></span>
+              <button data-x="-1" data-y="0">左</button><button id="stopBtn" class="danger">停</button><button data-x="1" data-y="0">右</button>
+              <span></span><button data-x="0" data-y="-1">后</button><span></span>
+            </div>
+            <div class="slider-row"><span>速度</span><input id="speed" type="range" min="20" max="100" value="70"><strong id="speedText">70%</strong></div>
+            <div class="status-grid" style="margin-top: 12px;">
+              <span>运动向量</span><strong id="vector">--</strong>
+              <span>灯光模式</span><strong id="lightMode">--</strong>
+              <span>舞蹈模式</span><strong id="danceMode">--</strong>
+              <span>命令序号</span><strong id="motionSeq">--</strong>
+            </div>
+            <div id="moveMsg" class="message"></div>
+          </div>
         </div>
-        <div id="statusMsg" class="message"></div>
       </section>
     </div>
   </main>
@@ -288,6 +172,7 @@
     const pad = $('pad');
     const stick = $('stick');
     const wsState = $('wsState');
+    const apState = $('apState');
     const speed = $('speed');
     const speedText = $('speedText');
     const lightModes = [
@@ -298,7 +183,6 @@
       { mode: 6, label: 'E Show' },
       { mode: 7, label: 'F Sleep' }
     ];
-
     let ws = null;
     let joystickActive = false;
     let holdTimer = null;
@@ -307,19 +191,14 @@
     let lastMoveSentAt = 0;
     let trim = 0;
 
-    function setMessage(el, text, type = '') {
-      el.className = 'message ' + type;
-      el.textContent = text;
+    function setMessage(el, text, type = '') { el.className = 'message ' + type; el.textContent = text; }
+    function clamp(value, min, max) { return Math.min(max, Math.max(min, value)); }
+    function scaled(value) { return clamp(value * Number(speed.value) / 100, -1, 1); }
+    function webUrlFromStatus(s) {
+      const ip = s.ap_ip || '192.168.4.1';
+      const port = Number(s.http_port || 80);
+      return port === 80 ? `http://${ip}` : `http://${ip}:${port}`;
     }
-
-    function clamp(value, min, max) {
-      return Math.min(max, Math.max(min, value));
-    }
-
-    function scaled(value) {
-      return clamp(value * Number(speed.value) / 100, -1, 1);
-    }
-
     function sendWs(text) {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(text);
@@ -328,30 +207,54 @@
       return false;
     }
 
+    async function api(path, options) {
+      const res = await fetch(path, options);
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error(text || 'Bad JSON'); }
+      if (!res.ok || data.ok === false) throw new Error(data.message || res.statusText);
+      return data;
+    }
+
     async function postForm(path, data) {
-      const body = new URLSearchParams(data);
-      const res = await fetch(path, { method: 'POST', body });
-      const json = await res.json();
-      if (!res.ok || json.ok === false) {
-        throw new Error(json.message || res.statusText);
+      return api(path, { method: 'POST', body: new URLSearchParams(data) });
+    }
+
+    async function refreshStatus() {
+      try {
+        const s = await api('/api/status');
+        const url = webUrlFromStatus(s);
+        $('guideApSsid').textContent = s.ap_ssid || '--';
+        $('guideUrl').textContent = url;
+        $('guideUrl').href = url;
+        $('apSsid').textContent = s.ap_ssid || '--';
+        $('apIp').textContent = url;
+        $('clients').textContent = `${s.clients || 0} 台`;
+        $('vector').textContent = `x${Number(s.x || 0).toFixed(2)} y${Number(s.y || 0).toFixed(2)}`;
+        $('lightMode').textContent = s.light_mode ?? '--';
+        $('danceMode').textContent = s.dance_mode ?? '--';
+        $('motionSeq').textContent = s.motion_seq ?? '--';
+        $('lastCommand').textContent = s.last_command || '--';
+        apState.textContent = `${s.clients || 0} CLIENT`;
+        apState.className = `pill ${(s.clients || 0) > 0 ? 'ok' : 'warn'}`;
+        setMessage($('statusMsg'), '连接小车热点后打开本页即可控制，不需要连接路由器。', 'ok');
+      } catch (err) {
+        apState.textContent = 'OFFLINE';
+        apState.className = 'pill bad';
+        setMessage($('statusMsg'), err.message, 'bad');
       }
-      return json;
     }
 
     async function sendMove(x, y, force = false) {
       const now = Date.now();
-      if (!force && now - lastMoveSentAt < 80) {
-        return;
-      }
+      if (!force && now - lastMoveSentAt < 80) return;
       lastMoveSentAt = now;
       lastRawX = x;
       lastRawY = y;
       const sx = scaled(x + trim);
       const sy = scaled(y);
       const command = `x${sx.toFixed(2)} y${sy.toFixed(2)}`;
-      if (!sendWs(command)) {
-        await postForm('/api/move', { x: sx, y: sy, speed: 100 });
-      }
+      if (!sendWs(command)) await postForm('/api/move', { x: sx.toFixed(2), y: sy.toFixed(2), speed: '100' });
       setMessage($('moveMsg'), command);
     }
 
@@ -360,9 +263,7 @@
       lastRawY = 0;
       lastMoveSentAt = 0;
       stick.style.transform = 'translate(0px, 0px)';
-      if (!sendWs('stop')) {
-        await postForm('/api/stop', {});
-      }
+      if (!sendWs('stop')) await postForm('/api/stop', {});
       setMessage($('moveMsg'), 'x0.00 y0.00');
     }
 
@@ -387,19 +288,16 @@
       const v = padVector(event);
       sendMove(v.x, v.y, true);
     });
-
     pad.addEventListener('pointermove', (event) => {
       if (!joystickActive) return;
       const v = padVector(event);
       sendMove(v.x, v.y);
     });
-
     function endJoystick() {
       if (!joystickActive) return;
       joystickActive = false;
       stopMove();
     }
-
     pad.addEventListener('pointerup', endJoystick);
     pad.addEventListener('pointercancel', endJoystick);
     pad.addEventListener('pointerleave', endJoystick);
@@ -425,7 +323,7 @@
     });
 
     $('stopBtn').addEventListener('click', stopMove);
-
+    $('refreshBtn').addEventListener('click', refreshStatus);
     speed.addEventListener('input', () => {
       speedText.textContent = `${speed.value}%`;
       if (lastRawX || lastRawY) sendMove(lastRawX, lastRawY, true);
@@ -436,9 +334,7 @@
       btn.textContent = item.label;
       btn.addEventListener('click', async () => {
         try {
-          if (!sendWs(`w${item.mode}`)) {
-            await postForm('/api/light', { mode: item.mode });
-          }
+          if (!sendWs(`w${item.mode}`)) await postForm('/api/light', { mode: String(item.mode) });
           setMessage($('lightMsg'), `w${item.mode}`, 'ok');
         } catch (err) {
           setMessage($('lightMsg'), err.message, 'bad');
@@ -446,72 +342,38 @@
       });
       $('lightModes').appendChild(btn);
     });
-
     $('danceBtn').addEventListener('click', async () => {
-      if (!sendWs('d1')) {
-        await postForm('/api/dance', { mode: 1 });
+      try {
+        if (!sendWs('d1')) await postForm('/api/dance', { mode: '1' });
+        setMessage($('lightMsg'), 'd1', 'ok');
+      } catch (err) {
+        setMessage($('lightMsg'), err.message, 'bad');
       }
-      setMessage($('lightMsg'), 'd1', 'ok');
     });
-
     $('trimLeft').addEventListener('click', async () => {
       trim = clamp(trim - 0.02, -0.2, 0.2);
-      const value = -0.02;
-      if (!sendWs(`c${value.toFixed(2)}`)) {
-        await postForm('/api/correction', { value });
-      }
+      const value = '-0.02';
+      if (!sendWs(`c${value}`)) await postForm('/api/correction', { value });
       setMessage($('lightMsg'), `trim ${trim.toFixed(2)}`);
     });
-
     $('trimRight').addEventListener('click', async () => {
       trim = clamp(trim + 0.02, -0.2, 0.2);
-      const value = 0.02;
-      if (!sendWs(`c${value.toFixed(2)}`)) {
-        await postForm('/api/correction', { value });
-      }
+      const value = '0.02';
+      if (!sendWs(`c${value}`)) await postForm('/api/correction', { value });
       setMessage($('lightMsg'), `trim ${trim.toFixed(2)}`);
     });
-
-    async function refreshStatus() {
-      try {
-        const s = await (await fetch('/api/status')).json();
-        $('apSsid').textContent = s.ap_ssid || '--';
-        $('apIp').textContent = s.ap_ip || '--';
-        $('clients').textContent = s.clients;
-        $('vector').textContent = `x${Number(s.x).toFixed(2)} y${Number(s.y).toFixed(2)}`;
-        $('lightMode').textContent = s.light_mode;
-        $('lastCommand').textContent = s.last_command || '--';
-        setMessage($('statusMsg'), `seq ${s.motion_seq}, moving ${s.moving ? 'yes' : 'no'}`);
-      } catch (err) {
-        setMessage($('statusMsg'), err.message, 'bad');
-      }
-    }
 
     function connectWs() {
       const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(`${scheme}//${location.host}/ws`);
-
-      ws.onopen = () => {
-        wsState.textContent = 'ONLINE';
-        wsState.className = 'pill ok';
-        setMessage($('moveMsg'), 'WebSocket ready', 'ok');
-      };
-
-      ws.onclose = () => {
-        wsState.textContent = 'RETRY';
-        wsState.className = 'pill warn';
-        setTimeout(connectWs, 1000);
-      };
-
-      ws.onerror = () => {
-        wsState.textContent = 'ERROR';
-        wsState.className = 'pill bad';
-      };
+      ws.onopen = () => { wsState.textContent = 'ONLINE'; wsState.className = 'pill ok'; };
+      ws.onclose = () => { wsState.textContent = 'RETRY'; wsState.className = 'pill warn'; setTimeout(connectWs, 1000); };
+      ws.onerror = () => { wsState.textContent = 'ERROR'; wsState.className = 'pill bad'; };
     }
 
     connectWs();
     refreshStatus();
-    setInterval(refreshStatus, 1000);
+    setInterval(refreshStatus, 1200);
     setInterval(() => sendWs('PING'), 500);
   </script>
 </body>

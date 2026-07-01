@@ -315,6 +315,10 @@ static uint8_t glyph5x7(char c, int row)
         return (row == 2 || row == 4) ? 0x04 : 0;
     case '_':
         return row == 6 ? 0x1F : 0;
+    case '?': {
+        static const uint8_t question[7] = {0x0E, 0x11, 0x01, 0x02, 0x04, 0x00, 0x04};
+        return question[row];
+    }
     case ' ':
     default:
         return 0;

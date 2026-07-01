@@ -4,20 +4,31 @@
 
 本项目不使用触摸输入，也不使用外接按键。重点放在 Web 页面、HTTP API、WiFi 状态机、NVS 参数保存和 LCD 状态反馈。
 
+## 当前配网逻辑
+
+1. 每次重新构建并烧录新固件后，设备第一次启动会清空 NVS 中旧的路由器 WiFi SSID/密码。
+2. 设备启动 SoftAP 配置热点，热点名为 `SparkBot-Config-<SoftAP MAC>`，例如 `SparkBot-Config-AABBCCDDEEFF`。
+3. LCD 首先显示 `JOIN AP` 和完整热点名，提示用户先用手机或电脑连接硬件 AP WiFi。
+4. 用户连接到这个 AP 后，LCD 切换显示配置地址：`192.168.4.1 / OPEN WEB`。
+5. 用户在浏览器打开 `http://192.168.4.1`，在网页中扫描并填写路由器 WiFi。
+6. 点击“保存并连接”后，LCD 显示正在连接的路由器 WiFi 名，例如 `HOME_WIFI / JOIN WIFI`。
+7. 连接成功后，LCD 显示已经连接的 WiFi 名和成功状态，例如 `HOME_WIFI / WIFI OK`。
+8. 连接失败后，LCD 显示目标 WiFi 名和失败状态，例如 `HOME_WIFI / WIFI FAIL`。
+
+普通断电重启不会清空已经配好的 WiFi；只有固件构建标记变化后的第一次启动才会清空旧配置。这样烧录新程序时一定从 AP 配网开始，用户配好后日常重启仍能自动连接。
+
 ## 目标现象
 
-- LCD 显示当前网络状态。
-- 设备创建配置热点：`SparkBot-Config-<SoftAP MAC>`，例如 `SparkBot-Config-AABBCCDDEEFF`。
-- 配置热点名称会使用硬件 SoftAP MAC 地址作为后缀，避免多台设备同时配网时连错。
-- 刚启动配置热点时，LCD 会显示 `JOIN AP` 和完整热点名。
-- 未配网时，LCD 会在热点名和配置地址之间轮流提示：`JOIN AP / SparkBot-Config-...`、`192.168.4.1 / OPEN WEB`。
-- 手机或电脑连接该热点后，浏览器访问 `http://192.168.4.1`。
+- LCD 显示当前网络状态和下一步操作。
+- 设备创建配置热点：`SparkBot-Config-<SoftAP MAC>`。
+- 热点名使用硬件 SoftAP MAC 地址作为后缀，避免多台设备同时配网时连错。
+- 手机或电脑接入配置热点后，LCD 显示 `192.168.4.1 / OPEN WEB`。
 - 网页顶部提供“配网提示”，显示应连接的热点名和应打开的配置地址。
 - 网页可以扫描附近 WiFi。
 - 网页可以提交 SSID 和密码。
 - 设备把 WiFi 配置保存到 NVS。
-- 连接成功后，LCD 显示 `ONLINE` 和 STA IP。
-- 连接失败后，LCD 显示 `FAILED`，网页可以看到失败原因。
+- 连接成功后，LCD 显示 `<SSID> / WIFI OK`。
+- 连接失败后，LCD 显示 `<SSID> / WIFI FAIL`，网页可以看到失败原因。
 - 网页支持清除已保存的 WiFi 配置。
 
 ## 学生重点学习什么
@@ -27,51 +38,59 @@
 1. ESP32-S3 同时工作在 AP + STA 模式。
 2. AP 模式提供一个临时局域网，用来访问配置网页。
 3. 配置热点名由固定前缀加 SoftAP MAC 后缀组成，便于区分不同硬件。
-4. HTTP Server 提供页面和 JSON API。
-5. 前端页面通过 `fetch()` 调用 `/api/status`、`/api/scan`、`/api/wifi`。
-6. 后端收到 SSID 和密码后，写入 NVS。
-7. ESP32-S3 切到 STA 连接路由器。
-8. WiFi 事件回调更新状态机。
-9. LCD 只负责显示状态，不承担网络逻辑。
+4. 固件构建标记写入 NVS，用来判断新固件烧录后是否需要清空旧 WiFi 配置。
+5. HTTP Server 提供页面和 JSON API。
+6. 前端页面通过 `fetch()` 调用 `/api/status`、`/api/scan`、`/api/wifi`。
+7. 后端收到 SSID 和密码后，写入 NVS。
+8. ESP32-S3 切到 STA 连接路由器。
+9. WiFi 事件回调更新状态机。
+10. LCD 只负责显示状态，不承担网络逻辑。
 
 ## 配网流程
 
 ```text
-开机
+新固件第一次启动
   |
   v
-初始化 NVS / LCD / WiFi / HTTP Server
+清空 NVS 中旧的路由器 SSID/密码
   |
   v
 启动 SoftAP: SparkBot-Config-<SoftAP MAC>
   |
-  +-- LCD 立即提示: JOIN AP / SparkBot-Config-<SoftAP MAC>
+  +-- LCD: JOIN AP / SparkBot-Config-<SoftAP MAC>
   |
   v
-读取 NVS 中保存的 SSID/密码
+手机或电脑连接配置热点
   |
-  +-- 没有配置 --> CONFIG 状态，LCD 轮流提示热点名和 http://192.168.4.1，等待网页提交
+  +-- LCD: 192.168.4.1 / OPEN WEB
   |
-  +-- 有配置 ----> CONNECTING 状态，尝试连接路由器
-                         |
-                         +-- 成功 --> CONNECTED 状态，显示 STA IP
-                         |
-                         +-- 失败 --> 重试，超过次数后 FAILED
+  v
+浏览器打开 http://192.168.4.1
+  |
+  v
+网页填写路由器 SSID/密码并提交
+  |
+  +-- LCD: <SSID> / JOIN WIFI
+  |
+  +-- 成功 --> LCD: <SSID> / WIFI OK
+  |
+  +-- 失败 --> LCD: <SSID> / WIFI FAIL
 ```
 
 ## LCD 提示
 
 | 场景 | LCD 显示 | 含义 |
 | --- | --- | --- |
-| 配置热点刚启动 | `JOIN AP / SparkBot-Config-AABBCCDDEEFF` | 先让手机或电脑连接这个热点 |
-| 未配网轮显 1 | `JOIN AP / SparkBot-Config-AABBCCDDEEFF` | 提醒用户连接正确设备，后缀来自硬件 SoftAP MAC |
-| 未配网轮显 2 | `192.168.4.1 / OPEN WEB` | 连接热点后，在浏览器打开这个地址 |
-| 手机或电脑接入配置热点 | `192.168.4.1 / OPEN WEB` | 已有人连上配置热点，再提示打开配置页 |
-| 正在连接路由器 | `JOIN WIFI / <SSID>` 或 `RETRY / CONNECTING` | 正在连接用户填写的路由器 WiFi |
-| 连接成功 | `ONLINE / <STA IP>` | 已经连上路由器，可以访问设备 STA IP |
-| 连接失败 | `FAILED / CHECK PASS` | 通常是密码错误、信号差或路由器不可达 |
+| 新固件启动或未配置 | `JOIN AP / SparkBot-Config-AABBCCDDEEFF` | 先让手机或电脑连接这个硬件 AP |
+| 手机或电脑接入配置热点 | `192.168.4.1 / OPEN WEB` | 已接入 AP，浏览器打开这个地址配网 |
+| 正在连接路由器 | `<SSID> / JOIN WIFI` | 正在连接用户填写的路由器 WiFi |
+| 路由器连接重试 | `<SSID> / RETRY WIFI` | 正在重试连接同一个路由器 WiFi |
+| 连接成功 | `<SSID> / WIFI OK` | 已连接到这个路由器 WiFi |
+| 连接失败 | `<SSID> / WIFI FAIL` | 连接失败，通常是密码错误、信号差或路由器不可达 |
 
 如果 `SPARKBOT_WEB_CONFIG_HTTP_PORT` 不是 `80`，LCD 和网页会显示带端口的地址，例如 `192.168.4.1:8080`，浏览器中访问 `http://192.168.4.1:8080`。
+
+LCD 内置字库主要支持英文字母、数字、空格、`-`、`.`、`:`、`_` 和 `?`；SSID 中其他字符会显示成 `?`，超长名称会用 `...` 截断。
 
 ## Web 页面
 
@@ -86,10 +105,10 @@
 
 | 状态 | LCD 显示 | 含义 |
 | --- | --- | --- |
-| `config` | `JOIN AP / SparkBot-Config-...` 和 `192.168.4.1 / OPEN WEB` 轮显 | 还没有可用 WiFi 配置，等待网页填写 |
-| `connecting` | `JOIN WIFI` 或 `RETRY` | 正在连接路由器 |
-| `connected` | `ONLINE / <IP>` | 已经连上路由器 |
-| `failed` | `FAILED / CHECK PASS` | 连接失败，通常是密码错误、信号差或路由器不可达 |
+| `config` | 未接入 AP 时 `JOIN AP / SparkBot-Config-...`；接入 AP 后 `192.168.4.1 / OPEN WEB` | 等待网页填写路由器 WiFi |
+| `connecting` | `<SSID> / JOIN WIFI` 或 `<SSID> / RETRY WIFI` | 正在连接路由器 |
+| `connected` | `<SSID> / WIFI OK` | 已经连上路由器 |
+| `failed` | `<SSID> / WIFI FAIL` | 连接失败 |
 
 ## Web API
 
@@ -113,6 +132,7 @@
   "ap_ssid": "SparkBot-Config-AABBCCDDEEFF",
   "ap_ip": "192.168.4.1",
   "http_port": 80,
+  "ap_client_connected": true,
   "rssi": -48,
   "retry": 0,
   "last_error": "OK"
@@ -158,13 +178,13 @@ ssid=HomeWiFi&password=12345678
 
 ### `POST /api/forget`
 
-清除 NVS 中保存的 WiFi 配置，并回到 `config` 状态。LCD 会重新开始提示配置热点名和配置地址。
+清除 NVS 中保存的 WiFi 配置，并回到 `config` 状态。LCD 会重新显示 `JOIN AP / SparkBot-Config-...`。
 
 ## 文件结构
 
 | 文件 | 作用 |
 | --- | --- |
-| `main/lcd_wifi_web_config_main.c` | 主程序：WiFi、HTTP API、NVS、状态机、LCD 状态提示 |
+| `main/lcd_wifi_web_config_main.c` | 主程序：WiFi、HTTP API、NVS、固件标记、状态机、LCD 状态提示 |
 | `main/index.html` | Web 配网页面和配网提示 |
 | `main/Kconfig.projbuild` | 可配置 SoftAP 名称前缀、密码、端口和重试次数 |
 | `components/lcd_face_ui/` | LCD 初始化和表情绘制组件 |
@@ -200,17 +220,20 @@ idf.py build flash monitor
 
 ## 使用方法
 
-1. 烧录后等待 LCD 显示 `JOIN AP / SparkBot-Config-...`。
-2. 手机或电脑连接 LCD 上显示的完整 WiFi 热点，例如 `SparkBot-Config-AABBCCDDEEFF`。
-3. 默认密码是 `12345678`。
-4. LCD 会轮流显示或在设备接入热点后显示 `192.168.4.1 / OPEN WEB`。
-5. 浏览器打开 `http://192.168.4.1`。
-6. 页面顶部“配网提示”会再次显示当前热点名和配置地址。
-7. 点击“扫描 WiFi”。
-8. 选择或手动输入路由器 SSID。
-9. 输入路由器密码。
-10. 点击“保存并连接”。
-11. 连接成功后，LCD 显示 `ONLINE` 和设备在路由器中的 IP。
+1. 烧录新固件后，设备第一次启动会清空旧的路由器 WiFi 配置。
+2. 等待 LCD 显示 `JOIN AP / SparkBot-Config-...`。
+3. 手机或电脑连接 LCD 上显示的完整 WiFi 热点，例如 `SparkBot-Config-AABBCCDDEEFF`。
+4. 默认密码是 `12345678`。
+5. 手机或电脑连上热点后，LCD 会切换显示 `192.168.4.1 / OPEN WEB`。
+6. 浏览器打开 `http://192.168.4.1`。
+7. 页面顶部“配网提示”会再次显示当前热点名和配置地址。
+8. 点击“扫描 WiFi”。
+9. 选择或手动输入路由器 SSID。
+10. 输入路由器密码。
+11. 点击“保存并连接”。
+12. LCD 显示正在连接的路由器 SSID，例如 `HOME_WIFI / JOIN WIFI`。
+13. 连接成功后，LCD 显示 `HOME_WIFI / WIFI OK`。
+14. 连接失败后，LCD 显示 `HOME_WIFI / WIFI FAIL`。
 
 连接成功后，也可以在同一个局域网里访问设备的 STA IP，例如：
 
@@ -250,24 +273,27 @@ SparkBot Web WiFi Config
 
 ```text
 ESP-SparkBot LCD WiFi web config starting
+New firmware marker detected, clear saved WiFi credentials
 Config AP started: SparkBot-Config-AABBCCDDEEFF, http://192.168.4.1
 HTTP server started on port 80
-No saved WiFi credentials, stay in config mode
+Firmware changed, WiFi credentials cleared, stay in config mode
 Connecting to SSID: HomeWiFi
 WiFi connected, STA IP: 192.168.1.23
 ```
 
 验收时检查：
 
-- LCD 一开始能显示 `JOIN AP` 和完整热点名 `SparkBot-Config-...`。
-- LCD 在配置状态能轮流显示热点名和 `192.168.4.1 / OPEN WEB`。
+- 重新构建并烧录新固件后，设备不会直接连接旧路由器，而是先显示 `JOIN AP / SparkBot-Config-...`。
 - 手机或电脑能连接到 LCD 上显示的完整热点名。
+- 手机或电脑连上热点后，LCD 切换显示 `192.168.4.1 / OPEN WEB`。
 - 能打开 `http://192.168.4.1`。
 - 网页顶部“配网提示”显示的热点名和 LCD 一致。
 - 网页能扫描 WiFi。
-- 提交正确密码后可以连接路由器。
-- 断电重启后会自动读取 NVS 并重新连接。
-- 点击“清除配置”后会回到配置模式，并重新显示热点名和配置地址。
+- 提交正确密码后，LCD 显示 `<SSID> / JOIN WIFI`。
+- 连接成功后，LCD 显示 `<SSID> / WIFI OK`。
+- 连接失败后，LCD 显示 `<SSID> / WIFI FAIL`。
+- 普通断电重启不会清空已保存 WiFi，同一固件会自动连接已保存路由器。
+- 点击“清除配置”后会回到配置模式，并重新显示热点名。
 
 ## 常见问题
 
@@ -275,15 +301,19 @@ WiFi connected, STA IP: 192.168.1.23
 
 先确认手机或电脑已经连接到 LCD 上显示的完整配置热点名，例如 `SparkBot-Config-AABBCCDDEEFF`。如果手机提示“此网络无法访问互联网”，不要切走，这正是配置热点的正常现象。
 
+### 为什么烧录后旧 WiFi 不再自动连接
+
+这是当前设计：固件构建标记变化后，第一次启动会清空旧的路由器 SSID/密码，让用户每次烧录新固件都从 AP 配网流程开始。
+
 ### 找不到 `SparkBot-Config`
 
-现在热点名不再只是固定的 `SparkBot-Config`，而是带 SoftAP MAC 后缀，例如 `SparkBot-Config-AABBCCDDEEFF`。请以 LCD 显示的完整名称为准。
+热点名不是固定的 `SparkBot-Config`，而是带 SoftAP MAC 后缀，例如 `SparkBot-Config-AABBCCDDEEFF`。请以 LCD 显示的完整名称为准。
 
 ### 扫描不到 WiFi
 
 确认路由器是 2.4 GHz WiFi。ESP32-S3 不能连接 5 GHz WiFi。
 
-### 一直显示 `FAILED`
+### 一直显示 `WIFI FAIL`
 
 优先检查：
 
@@ -313,8 +343,10 @@ WiFi connected, STA IP: 192.168.1.23
 这个项目的核心不是 HTML 页面，而是状态流：
 
 ```text
-网页输入 -> HTTP POST -> NVS 保存 -> esp_wifi_set_config()
-        -> esp_wifi_connect() -> WiFi/IP 事件 -> 状态更新 -> LCD/Web 刷新
+新固件启动 -> 清空旧 WiFi -> 启动配置 AP -> 手机接入 AP
+        -> LCD 显示配置 IP -> 网页输入 -> HTTP POST -> NVS 保存
+        -> esp_wifi_set_config() -> esp_wifi_connect()
+        -> WiFi/IP 事件 -> LCD/Web 刷新
 ```
 
 学生只要把这条链路读通，就基本掌握了 ESP32 Web 配网项目的骨架。

@@ -4,8 +4,8 @@ menu "SparkBot Web Car Control"
         string "SoftAP SSID prefix"
         default "SparkBot-Car"
         help
-            The final SSID appends the last two bytes of the SoftAP MAC,
-            for example SparkBot-Car-A1B2.
+            The final SSID appends the full SoftAP MAC address,
+            for example SparkBot-Car-AABBCCDDEEFF.
 
     config SPARKBOT_WEB_CAR_AP_PASSWORD
         string "SoftAP password"

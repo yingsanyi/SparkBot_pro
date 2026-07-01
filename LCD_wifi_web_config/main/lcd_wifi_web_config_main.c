@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "esp_app_desc.h"
 #include "esp_check.h"
 #include "esp_err.h"
 #include "esp_event.h"
@@ -24,12 +25,15 @@
 #define WIFI_NAMESPACE              "wifi_web"
 #define WIFI_KEY_SSID               "ssid"
 #define WIFI_KEY_PASSWORD           "password"
+#define WIFI_KEY_FW_MARKER          "fw_marker"
 
 #define WIFI_SSID_MAX_LEN           32
 #define WIFI_PASSWORD_MAX_LEN       63
 #define HTTP_BODY_MAX_LEN           384
 #define WIFI_SCAN_MAX_AP            20
+#define WIFI_AP_MAX_CLIENTS         4
 #define WIFI_AP_SUFFIX_CHARS        13
+#define LCD_TITLE_MAX_CHARS         20
 
 typedef enum {
     APP_NET_STATE_CONFIG = 0,
@@ -53,6 +57,7 @@ typedef struct {
     char ap_ip[16];
     char last_error[64];
     int retry;
+    bool ap_client_connected;
 } app_status_snapshot_t;
 
 extern const unsigned char index_html_start[] asm("_binary_index_html_start");
@@ -68,6 +73,7 @@ static httpd_handle_t s_httpd;
 static app_net_state_t s_net_state = APP_NET_STATE_CONFIG;
 static bool s_has_credentials;
 static bool s_ignore_next_disconnect;
+static int s_ap_client_count;
 static char s_current_ssid[WIFI_SSID_MAX_LEN + 1];
 static char s_sta_ip[16] = "0.0.0.0";
 static char s_ap_ssid[WIFI_SSID_MAX_LEN + 1] = CONFIG_SPARKBOT_WEB_CONFIG_AP_SSID;
@@ -81,6 +87,50 @@ static void copy_string(char *dst, size_t dst_len, const char *src)
         return;
     }
     snprintf(dst, dst_len, "%s", src ? src : "");
+}
+
+static void lcd_format_display_text(char *dst, size_t dst_len, const char *src, size_t max_chars)
+{
+    if (dst_len == 0) {
+        return;
+    }
+
+    if (!src || src[0] == '\0') {
+        copy_string(dst, dst_len, "WIFI");
+        return;
+    }
+
+    size_t out = 0;
+    bool truncated = false;
+    for (const unsigned char *p = (const unsigned char *)src; *p; p++) {
+        if (out >= max_chars || out + 1 >= dst_len) {
+            truncated = true;
+            break;
+        }
+
+        char c = (char)*p;
+        if (c >= 'a' && c <= 'z') {
+            c = (char)(c - 'a' + 'A');
+        }
+
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+            c == '-' || c == '.' || c == ':' || c == '_' || c == ' ') {
+            dst[out++] = c;
+        } else {
+            dst[out++] = '?';
+        }
+    }
+
+    if (truncated && out >= 3) {
+        dst[out - 3] = '.';
+        dst[out - 2] = '.';
+        dst[out - 1] = '.';
+    }
+    dst[out] = '\0';
+
+    if (out == 0) {
+        copy_string(dst, dst_len, "WIFI");
+    }
 }
 
 static const char *state_to_string(app_net_state_t state)
@@ -204,6 +254,22 @@ static void lcd_post_web_prompt(void)
     lcd_post(LCD_FACE_SCENE_SURPRISED, web_addr, "OPEN WEB");
 }
 
+static void lcd_post_join_wifi_prompt(const char *ssid, bool retry)
+{
+    char display_ssid[24] = {0};
+    lcd_format_display_text(display_ssid, sizeof(display_ssid), ssid, LCD_TITLE_MAX_CHARS);
+    lcd_post(LCD_FACE_SCENE_WINK, display_ssid, retry ? "RETRY WIFI" : "JOIN WIFI");
+}
+
+static void lcd_post_wifi_result_prompt(const char *ssid, bool connected)
+{
+    char display_ssid[24] = {0};
+    lcd_format_display_text(display_ssid, sizeof(display_ssid), ssid, LCD_TITLE_MAX_CHARS);
+    lcd_post(connected ? LCD_FACE_SCENE_HAPPY : LCD_FACE_SCENE_ANGRY,
+             display_ssid,
+             connected ? "WIFI OK" : "WIFI FAIL");
+}
+
 static void lcd_status_task(void *arg)
 {
     (void)arg;
@@ -230,6 +296,7 @@ static void status_get_snapshot(app_status_snapshot_t *snapshot)
     snapshot->state = s_net_state;
     snapshot->configured = s_has_credentials;
     snapshot->retry = s_retry_count;
+    snapshot->ap_client_connected = s_ap_client_count > 0;
     copy_string(snapshot->ssid, sizeof(snapshot->ssid), s_current_ssid);
     copy_string(snapshot->sta_ip, sizeof(snapshot->sta_ip), s_sta_ip);
     copy_string(snapshot->ap_ssid, sizeof(snapshot->ap_ssid), s_ap_ssid);
@@ -329,6 +396,54 @@ static esp_err_t nvs_forget_wifi(void)
     return err_commit;
 }
 
+static void build_firmware_marker(char *marker, size_t marker_len)
+{
+    const esp_app_desc_t *desc = esp_app_get_description();
+    snprintf(marker, marker_len, "%s|%s|%s|%s",
+             desc->project_name, desc->version, desc->date, desc->time);
+}
+
+static esp_err_t nvs_clear_wifi_after_new_firmware(bool *cleared)
+{
+    if (cleared) {
+        *cleared = false;
+    }
+
+    char current_marker[96] = {0};
+    char saved_marker[96] = {0};
+    build_firmware_marker(current_marker, sizeof(current_marker));
+
+    nvs_handle_t nvs;
+    ESP_RETURN_ON_ERROR(nvs_open(WIFI_NAMESPACE, NVS_READWRITE, &nvs), TAG, "open nvs failed");
+
+    size_t len = sizeof(saved_marker);
+    esp_err_t marker_err = nvs_get_str(nvs, WIFI_KEY_FW_MARKER, saved_marker, &len);
+    const bool marker_changed = marker_err != ESP_OK || strcmp(saved_marker, current_marker) != 0;
+    esp_err_t err = ESP_OK;
+
+    if (marker_changed) {
+        ESP_LOGI(TAG, "New firmware marker detected, clear saved WiFi credentials");
+        esp_err_t err_ssid = nvs_erase_key(nvs, WIFI_KEY_SSID);
+        esp_err_t err_pass = nvs_erase_key(nvs, WIFI_KEY_PASSWORD);
+        if (err_ssid != ESP_OK && err_ssid != ESP_ERR_NVS_NOT_FOUND) {
+            err = err_ssid;
+        } else if (err_pass != ESP_OK && err_pass != ESP_ERR_NVS_NOT_FOUND) {
+            err = err_pass;
+        } else {
+            err = nvs_set_str(nvs, WIFI_KEY_FW_MARKER, current_marker);
+        }
+        if (err == ESP_OK) {
+            err = nvs_commit(nvs);
+        }
+        if (err == ESP_OK && cleared) {
+            *cleared = true;
+        }
+    }
+
+    nvs_close(nvs);
+    return err;
+}
+
 static esp_err_t start_sta_connect(const char *ssid, const char *password, bool save_to_nvs)
 {
     if (!ssid || ssid[0] == '\0') {
@@ -371,7 +486,7 @@ static esp_err_t start_sta_connect(const char *ssid, const char *password, bool 
     copy_string(s_last_error, sizeof(s_last_error), "Connecting");
     xSemaphoreGive(s_status_lock);
 
-    lcd_post(LCD_FACE_SCENE_WINK, "JOIN WIFI", ssid);
+    lcd_post_join_wifi_prompt(ssid, false);
     ESP_LOGI(TAG, "Connecting to SSID: %s", ssid);
 
     esp_err_t err = esp_wifi_connect();
@@ -380,7 +495,7 @@ static esp_err_t start_sta_connect(const char *ssid, const char *password, bool 
         s_net_state = APP_NET_STATE_FAILED;
         copy_string(s_last_error, sizeof(s_last_error), esp_err_to_name(err));
         xSemaphoreGive(s_status_lock);
-        lcd_post(LCD_FACE_SCENE_ANGRY, "FAILED", "CONNECT");
+        lcd_post_wifi_result_prompt(ssid, false);
     }
 
     return err;
@@ -392,6 +507,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_START) {
         update_ap_ip_string();
+        xSemaphoreTake(s_status_lock, portMAX_DELAY);
+        s_ap_client_count = 0;
+        xSemaphoreGive(s_status_lock);
         ESP_LOGI(TAG, "Config AP started: %s, http://%s", s_ap_ssid, s_ap_ip);
         lcd_post_config_prompt();
         return;
@@ -399,7 +517,31 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
         ESP_LOGI(TAG, "A browser device joined the config AP");
+        xSemaphoreTake(s_status_lock, portMAX_DELAY);
+        if (s_ap_client_count < WIFI_AP_MAX_CLIENTS) {
+            s_ap_client_count++;
+        }
+        xSemaphoreGive(s_status_lock);
         lcd_post_web_prompt();
+        return;
+    }
+
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+        ESP_LOGI(TAG, "A browser device left the config AP");
+        xSemaphoreTake(s_status_lock, portMAX_DELAY);
+        if (s_ap_client_count > 0) {
+            s_ap_client_count--;
+        }
+        const bool in_config = s_net_state == APP_NET_STATE_CONFIG;
+        const bool has_ap_client = s_ap_client_count > 0;
+        xSemaphoreGive(s_status_lock);
+        if (in_config) {
+            if (has_ap_client) {
+                lcd_post_web_prompt();
+            } else {
+                lcd_post_config_prompt();
+            }
+        }
         return;
     }
 
@@ -409,6 +551,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         bool has_credentials = false;
         bool can_retry = false;
         int retry = 0;
+        char retry_ssid[WIFI_SSID_MAX_LEN + 1] = {0};
+        char failed_ssid[WIFI_SSID_MAX_LEN + 1] = {0};
 
         xSemaphoreTake(s_status_lock, portMAX_DELAY);
         has_credentials = s_has_credentials;
@@ -424,10 +568,12 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
             s_net_state = APP_NET_STATE_CONNECTING;
             s_retry_count++;
             retry = s_retry_count;
+            copy_string(retry_ssid, sizeof(retry_ssid), s_current_ssid);
             snprintf(s_last_error, sizeof(s_last_error), "Retry %d reason %d", retry, event->reason);
             can_retry = true;
         } else {
             s_net_state = APP_NET_STATE_FAILED;
+            copy_string(failed_ssid, sizeof(failed_ssid), s_current_ssid);
             snprintf(s_last_error, sizeof(s_last_error), "Failed reason %d", event->reason);
         }
         xSemaphoreGive(s_status_lock);
@@ -439,13 +585,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
         if (can_retry) {
             ESP_LOGW(TAG, "WiFi disconnected, retry %d", retry);
-            lcd_post(LCD_FACE_SCENE_WINK, "RETRY", "CONNECTING");
+            lcd_post_join_wifi_prompt(retry_ssid, true);
             esp_wifi_connect();
         } else if (!has_credentials) {
             lcd_post_config_prompt();
         } else {
             ESP_LOGW(TAG, "WiFi connect failed, reason=%d", event->reason);
-            lcd_post(LCD_FACE_SCENE_ANGRY, "FAILED", "CHECK PASS");
+            lcd_post_wifi_result_prompt(failed_ssid, false);
         }
         return;
     }
@@ -462,8 +608,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         copy_string(s_last_error, sizeof(s_last_error), "OK");
         xSemaphoreGive(s_status_lock);
 
+        app_status_snapshot_t snapshot;
+        status_get_snapshot(&snapshot);
         ESP_LOGI(TAG, "WiFi connected, STA IP: %s", ip_buf);
-        lcd_post(LCD_FACE_SCENE_HAPPY, "ONLINE", ip_buf);
+        lcd_post_wifi_result_prompt(snapshot.ssid, true);
         return;
     }
 }
@@ -490,7 +638,7 @@ static esp_err_t wifi_start_apsta(void)
     copy_string(s_ap_ssid, sizeof(s_ap_ssid), ap_ssid);
     ap_config.ap.ssid_len = strlen((char *)ap_config.ap.ssid);
     ap_config.ap.channel = CONFIG_SPARKBOT_WEB_CONFIG_AP_CHANNEL;
-    ap_config.ap.max_connection = 4;
+    ap_config.ap.max_connection = WIFI_AP_MAX_CLIENTS;
     ap_config.ap.pmf_cfg.required = false;
 
     const size_t ap_password_len = strlen(CONFIG_SPARKBOT_WEB_CONFIG_AP_PASSWORD);
@@ -587,8 +735,9 @@ static esp_err_t status_get_handler(httpd_req_t *req)
     ESP_RETURN_ON_ERROR(send_json_escaped(req, snapshot.sta_ip), TAG, "send sta ip failed");
     ESP_RETURN_ON_ERROR(send_chunk_str(req, "\",\"ap_ssid\":\""), TAG, "send status failed");
     ESP_RETURN_ON_ERROR(send_json_escaped(req, snapshot.ap_ssid), TAG, "send ap ssid failed");
-    snprintf(chunk, sizeof(chunk), "\",\"ap_ip\":\"%s\",\"http_port\":%d,\"rssi\":%d,\"retry\":%d,\"last_error\":\"",
-             snapshot.ap_ip, CONFIG_SPARKBOT_WEB_CONFIG_HTTP_PORT, rssi, snapshot.retry);
+    snprintf(chunk, sizeof(chunk), "\",\"ap_ip\":\"%s\",\"http_port\":%d,\"ap_client_connected\":%s,\"rssi\":%d,\"retry\":%d,\"last_error\":\"",
+             snapshot.ap_ip, CONFIG_SPARKBOT_WEB_CONFIG_HTTP_PORT,
+             snapshot.ap_client_connected ? "true" : "false", rssi, snapshot.retry);
     ESP_RETURN_ON_ERROR(send_chunk_str(req, chunk), TAG, "send status failed");
     ESP_RETURN_ON_ERROR(send_json_escaped(req, snapshot.last_error), TAG, "send error failed");
     ESP_RETURN_ON_ERROR(send_chunk_str(req, "\"}"), TAG, "send status failed");
@@ -853,6 +1002,9 @@ void app_main(void)
 
     ESP_ERROR_CHECK(init_nvs());
 
+    bool wifi_cleared_after_flash = false;
+    ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_clear_wifi_after_new_firmware(&wifi_cleared_after_flash));
+
     s_status_lock = xSemaphoreCreateMutex();
     ESP_ERROR_CHECK(s_status_lock ? ESP_OK : ESP_ERR_NO_MEM);
 
@@ -872,29 +1024,32 @@ void app_main(void)
         ESP_LOGI(TAG, "Loaded WiFi SSID from NVS: %s", ssid);
         ESP_ERROR_CHECK_WITHOUT_ABORT(start_sta_connect(ssid, password, false));
     } else {
-        ESP_LOGI(TAG, "No saved WiFi credentials, stay in config mode");
+        ESP_LOGI(TAG, "%s, stay in config mode",
+                 wifi_cleared_after_flash ? "Firmware changed, WiFi credentials cleared" : "No saved WiFi credentials");
         xSemaphoreTake(s_status_lock, portMAX_DELAY);
         s_has_credentials = false;
         xSemaphoreGive(s_status_lock);
-        set_config_state("No WiFi saved");
+        set_config_state(wifi_cleared_after_flash ? "Firmware cleared WiFi" : "No WiFi saved");
     }
     memset(password, 0, sizeof(password));
 
-    bool show_web_prompt = true;
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(4000));
 
         app_status_snapshot_t snapshot;
         status_get_snapshot(&snapshot);
         if (snapshot.state == APP_NET_STATE_CONFIG) {
-            if (show_web_prompt) {
+            if (snapshot.ap_client_connected) {
                 lcd_post_web_prompt();
             } else {
                 lcd_post_config_prompt();
             }
-            show_web_prompt = !show_web_prompt;
-        } else {
-            show_web_prompt = true;
+        } else if (snapshot.state == APP_NET_STATE_CONNECTING) {
+            lcd_post_join_wifi_prompt(snapshot.ssid, false);
+        } else if (snapshot.state == APP_NET_STATE_CONNECTED) {
+            lcd_post_wifi_result_prompt(snapshot.ssid, true);
+        } else if (snapshot.state == APP_NET_STATE_FAILED) {
+            lcd_post_wifi_result_prompt(snapshot.ssid, false);
         }
     }
 }
